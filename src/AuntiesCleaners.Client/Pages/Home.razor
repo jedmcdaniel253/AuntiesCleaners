@@ -7,8 +7,13 @@
 @inject NavigationManager Navigation
 
 @code {
-    protected override async Task OnInitializedAsync()
+    private bool _navigated;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (!firstRender || _navigated) return;
+        _navigated = true;
+
         if (!AuthService.IsAuthenticated)
         {
             Navigation.NavigateTo("login");
