@@ -16,12 +16,12 @@
 
         if (!AuthService.IsAuthenticated)
         {
-            Navigation.NavigateTo("login");
+            Navigation.NavigateToRoute("login");
             return;
         }
 
         var route = await GetFirstTabRouteAsync();
-        Navigation.NavigateTo(route);
+        Navigation.NavigateToRoute(route);
     }
 
     private async Task<string> GetFirstTabRouteAsync()

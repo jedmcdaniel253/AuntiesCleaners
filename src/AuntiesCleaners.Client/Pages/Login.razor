@@ -61,7 +61,7 @@
         if (AuthService.IsAuthenticated)
         {
             var route = await GetFirstTabRouteAsync();
-            Navigation.NavigateTo(route);
+            Navigation.NavigateToRoute(route);
         }
     }
 
@@ -87,7 +87,7 @@
             if (success)
             {
                 var route = await GetFirstTabRouteAsync();
-                Navigation.NavigateTo(route);
+                Navigation.NavigateToRoute(route);
             }
             else
             {

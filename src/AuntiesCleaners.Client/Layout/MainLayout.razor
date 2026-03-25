@@ -54,7 +54,7 @@ else
     private async Task HandleLogout()
     {
         await AuthService.LogoutAsync();
-        Navigation.NavigateTo("login");
+        Navigation.NavigateToRoute("login");
     }
 
     public void Dispose()
