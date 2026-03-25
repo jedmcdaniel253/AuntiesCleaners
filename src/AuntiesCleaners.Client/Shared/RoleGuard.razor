@@ -1,0 +1,27 @@
+@using AuntiesCleaners.Client.Models
+@using AuntiesCleaners.Client.Services
+@inject IAuthService AuthService
+
+@if (_isAuthorized)
+{
+    @ChildContent
+}
+
+@code {
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public Role[]? AllowedRoles { get; set; }
+
+    private bool _isAuthorized;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (AllowedRoles == null || AllowedRoles.Length == 0)
+        {
+            _isAuthorized = true;
+            return;
+        }
+
+        var role = await AuthService.GetCurrentRoleAsync();
+        _isAuthorized = role.HasValue && AllowedRoles.Contains(role.Value);
+    }
+}

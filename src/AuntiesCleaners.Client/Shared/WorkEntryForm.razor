@@ -1,0 +1,94 @@
+@using AuntiesCleaners.Client.Models
+@using AuntiesCleaners.Client.Services
+@inject IWorkEntryService WorkEntryService
+@inject IMowListService MowListService
+@inject IAuthService AuthService
+@inject ISnackbar Snackbar
+
+<MudForm @ref="_form">
+    <MudStack Spacing="3">
+        @if (_workerKey > 0)
+        {
+            <WorkerDropdown @key="_workerKey" @bind-Value="_workerId" />
+        }
+
+        <MudDatePicker Label="Date" @bind-Date="_entryDate" Variant="Variant.Outlined"
+                       Required="true" RequiredError="Date is required" />
+
+        <HouseDropdown @bind-Value="_houseId"
+                       IncludeMultipleHouses="@(Category != WorkCategory.Lawn)" />
+
+        @if (Category == WorkCategory.Cleaning || Category == WorkCategory.Maintenance)
+        {
+            <MudNumericField T="decimal" Label="Hours Billed" @bind-Value="_hoursBilled"
+                             Variant="Variant.Outlined" Min="0"
+                             Required="true" RequiredError="Hours Billed is required" />
+        }
+        else if (Category == WorkCategory.Laundry)
+        {
+            <MudNumericField T="int" Label="Number of Loads" @bind-Value="_numberOfLoads"
+                             Variant="Variant.Outlined" Min="0"
+                             Required="true" RequiredError="Number of Loads is required" />
+        }
+
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   OnClick="HandleSubmit" FullWidth="true">
+            Submit
+        </MudButton>
+    </MudStack>
+</MudForm>
+
+@code {
+    [Parameter] public WorkCategory Category { get; set; }
+    [Parameter] public EventCallback OnSubmitted { get; set; }
+
+    private MudForm _form = null!;
+    private Guid _workerId;
+    private DateTime? _entryDate = DateTime.Today;
+    private Guid _houseId;
+    private decimal _hoursBilled;
+    private int _numberOfLoads;
+    private int _workerKey = 1;
+
+    private async Task HandleSubmit()
+    {
+        await _form.ValidateAsync();
+        if (!_form.IsValid)
+            return;
+
+        var entry = new WorkEntry
+        {
+            WorkerId = _workerId,
+            HouseId = _houseId,
+            WorkCategoryValue = Category.ToString(),
+            EntryDate = _entryDate?.Date ?? DateTime.Today
+        };
+
+        if (Category == WorkCategory.Cleaning || Category == WorkCategory.Maintenance)
+        {
+            entry.HoursBilled = _hoursBilled;
+        }
+        else if (Category == WorkCategory.Laundry)
+        {
+            entry.NumberOfLoads = _numberOfLoads;
+        }
+
+        await WorkEntryService.CreateAsync(entry);
+
+        // Auto-clear mow status when a lawn entry is saved
+        if (Category == WorkCategory.Lawn)
+        {
+            await MowListService.ClearMowStatusForHouseAsync(entry.HouseId);
+        }
+
+        Snackbar.Add("Entry saved", Severity.Success);
+
+        // Reset form
+        _entryDate = DateTime.Today;
+        _hoursBilled = 0;
+        _numberOfLoads = 0;
+        _workerKey++; // Force WorkerDropdown to re-render and default to logged-in user
+
+        await OnSubmitted.InvokeAsync();
+    }
+}

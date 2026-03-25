@@ -1,0 +1,109 @@
+@page "/mow-list"
+@using AuntiesCleaners.Client.Models
+@using AuntiesCleaners.Client.Services
+@using AuntiesCleaners.Client.Shared
+@inject IMowListService MowListService
+@inject IHouseService HouseService
+@inject IAuthService AuthService
+@inject ISnackbar Snackbar
+
+<MudText Typo="Typo.h5" Class="mb-4">Mow List</MudText>
+
+@if (_loading)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else if (!_houseItems.Any())
+{
+    <MudText Typo="Typo.body1" Color="Color.Secondary">No active houses found.</MudText>
+}
+else
+{
+    <MudList T="string" Dense="true">
+        @foreach (var item in _houseItems)
+        {
+            <MudListItem T="string">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                        <MudIcon Icon="@(item.NeedsMowing ? Icons.Material.Filled.Grass : Icons.Material.Filled.CheckCircle)"
+                                 Color="@(item.NeedsMowing ? Color.Warning : Color.Success)"
+                                 aria-label="@(item.NeedsMowing ? "Needs mowing" : "Mowed")" />
+                        <MudText Typo="Typo.body1"
+                                 Style="@(item.NeedsMowing ? "color: var(--mud-palette-warning);" : "color: var(--mud-palette-success);")">
+                            @item.HouseName
+                        </MudText>
+                    </MudStack>
+
+                    @if (_canToggle)
+                    {
+                        <MudSwitch T="bool" Value="@item.NeedsMowing"
+                                   ValueChanged="@(val => ToggleMowStatus(item, val))"
+                                   Color="Color.Warning"
+                                   aria-label="@($"Toggle mow status for {item.HouseName}")" />
+                    }
+                    else
+                    {
+                        <MudChip T="string" Size="Size.Small"
+                                 Color="@(item.NeedsMowing ? Color.Warning : Color.Success)"
+                                 Variant="Variant.Filled">
+                            @(item.NeedsMowing ? "Needs Mowing" : "Mowed")
+                        </MudChip>
+                    }
+                </MudStack>
+            </MudListItem>
+        }
+    </MudList>
+}
+
+@code {
+    private bool _loading = true;
+    private bool _canToggle;
+    private List<HouseMowItem> _houseItems = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var role = await AuthService.GetCurrentRoleAsync();
+        _canToggle = role is Role.Manager or Role.Boss or Role.Admin;
+        await LoadData();
+        _loading = false;
+    }
+
+    private async Task LoadData()
+    {
+        var houses = (await HouseService.GetActiveAsync())
+            .Where(h => !h.IsMultipleHouses)
+            .OrderBy(h => h.Name)
+            .ToList();
+
+        var mowItems = await MowListService.GetAllAsync();
+        var mowDict = mowItems.ToDictionary(m => m.HouseId, m => m.NeedsMowing);
+
+        _houseItems = houses.Select(h => new HouseMowItem
+        {
+            HouseId = h.Id,
+            HouseName = h.Name,
+            NeedsMowing = mowDict.TryGetValue(h.Id, out var needs) && needs
+        }).ToList();
+    }
+
+    private async Task ToggleMowStatus(HouseMowItem item, bool needsMowing)
+    {
+        try
+        {
+            await MowListService.ToggleMowStatusAsync(item.HouseId, needsMowing);
+            item.NeedsMowing = needsMowing;
+            Snackbar.Add($"{item.HouseName} — {(needsMowing ? "needs mowing" : "mowed")}", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private class HouseMowItem
+    {
+        public Guid HouseId { get; set; }
+        public string HouseName { get; set; } = string.Empty;
+        public bool NeedsMowing { get; set; }
+    }
+}

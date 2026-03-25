@@ -1,0 +1,128 @@
+@using AuntiesCleaners.Client.Models
+@using AuntiesCleaners.Client.Services
+@inject IOcrService OcrService
+@inject IReceiptService ReceiptService
+@inject ISnackbar Snackbar
+
+<MudForm @ref="_form">
+    <MudStack Spacing="3">
+        <MudFileUpload T="IBrowserFile" Accept="image/*" FilesChanged="OnFileSelected"
+                       MaximumFileCount="1">
+            <ActivatorContent>
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.CameraAlt" FullWidth="true">
+                    Capture Receipt Photo
+                </MudButton>
+            </ActivatorContent>
+        </MudFileUpload>
+
+        @if (_isProcessingOcr)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+            <MudText Typo="Typo.caption" Align="Align.Center">Processing receipt...</MudText>
+        }
+
+        <MudTextField T="string" Label="Business Name" @bind-Value="_businessName"
+                      Variant="Variant.Outlined" Required="true"
+                      RequiredError="Business Name is required" />
+
+        <MudNumericField T="decimal" Label="Amount" @bind-Value="_amount"
+                         Variant="Variant.Outlined" Min="0" Format="F2"
+                         Required="true" RequiredError="Amount is required"
+                         Adornment="Adornment.Start" AdornmentText="$" />
+
+        <MudCheckBox T="bool" @bind-Value="_isReimbursable" Label="Reimbursable"
+                     Color="Color.Primary" />
+
+        <MudDatePicker Label="Date" @bind-Date="_receiptDate" Variant="Variant.Outlined"
+                       Required="true" RequiredError="Date is required" />
+
+        @if (_workerKey > 0)
+        {
+            <WorkerDropdown @key="_workerKey" @bind-Value="_workerId" />
+        }
+
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   OnClick="HandleSubmit" FullWidth="true" Disabled="_isProcessingOcr">
+            Submit
+        </MudButton>
+    </MudStack>
+</MudForm>
+
+@code {
+    [Parameter] public EventCallback OnSubmitted { get; set; }
+
+    private MudForm _form = null!;
+    private string _businessName = string.Empty;
+    private decimal _amount;
+    private bool _isReimbursable = true;
+    private DateTime? _receiptDate = DateTime.Today;
+    private Guid _workerId;
+    private int _workerKey = 1;
+    private bool _isProcessingOcr;
+    private byte[]? _photoBytes;
+    private string _photoFileName = string.Empty;
+
+    private async Task OnFileSelected(IBrowserFile file)
+    {
+        if (file is null) return;
+
+        _isProcessingOcr = true;
+        StateHasChanged();
+
+        try
+        {
+            using var stream = file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
+            using var ms = new System.IO.MemoryStream();
+            await stream.CopyToAsync(ms);
+            _photoBytes = ms.ToArray();
+            _photoFileName = file.Name;
+
+            var result = await OcrService.ExtractTextAsync(_photoBytes);
+            if (!string.IsNullOrWhiteSpace(result.BusinessName))
+                _businessName = result.BusinessName;
+            if (result.Amount > 0)
+                _amount = result.Amount;
+        }
+        catch
+        {
+            Snackbar.Add("OCR extraction failed. Please enter details manually.", Severity.Warning);
+        }
+        finally
+        {
+            _isProcessingOcr = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task HandleSubmit()
+    {
+        await _form.ValidateAsync();
+        if (!_form.IsValid)
+            return;
+
+        var receipt = new Receipt
+        {
+            WorkerId = _workerId,
+            ReceiptDate = _receiptDate?.Date ?? DateTime.Today,
+            BusinessName = _businessName,
+            Amount = _amount,
+            IsReimbursable = _isReimbursable
+        };
+
+        await ReceiptService.CreateAsync(receipt, _photoBytes ?? Array.Empty<byte>(), _photoFileName);
+        Snackbar.Add("Receipt saved", Severity.Success);
+
+        // Reset form - clear fields, re-check reimbursable, date back to today
+        _businessName = string.Empty;
+        _amount = 0;
+        _isReimbursable = true;
+        _receiptDate = DateTime.Today;
+        _photoBytes = null;
+        _photoFileName = string.Empty;
+        _workerKey++; // Force WorkerDropdown to re-render and default to logged-in user
+        await _form.ResetAsync();
+
+        await OnSubmitted.InvokeAsync();
+    }
+}

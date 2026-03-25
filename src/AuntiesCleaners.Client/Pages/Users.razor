@@ -1,0 +1,259 @@
+@page "/users"
+@using AuntiesCleaners.Client.Models
+@using AuntiesCleaners.Client.Services
+@using AuntiesCleaners.Client.Shared
+@inject IUserService UserService
+@inject IWorkerService WorkerService
+@inject ISnackbar Snackbar
+
+<RoleGuard AllowedRoles="@(new[] { Role.Boss, Role.Admin })">
+    <MudText Typo="Typo.h5" Class="mb-4">Users</MudText>
+
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mb-4" OnClick="ShowCreateForm">
+        Create User
+    </MudButton>
+
+    @if (_showCreateForm)
+    {
+        <MudPaper Class="pa-4 mb-4" Elevation="2">
+            <MudText Typo="Typo.h6" Class="mb-2">Create User</MudText>
+            <MudSelect T="Guid?" @bind-Value="_formWorkerId" Label="Link to Worker" Variant="Variant.Outlined" Class="mb-2"
+                       Clearable="true" Placeholder="Select a worker (optional)">
+                @foreach (var worker in _workers)
+                {
+                    <MudSelectItem T="Guid?" Value="@worker.Id">@worker.Name</MudSelectItem>
+                }
+            </MudSelect>
+            <MudTextField @bind-Value="_formName" Label="Name" Required="true" Variant="Variant.Outlined" Class="mb-2" />
+            <MudTextField @bind-Value="_formEmail" Label="Email" Required="true" InputType="InputType.Email"
+                          Variant="Variant.Outlined" Class="mb-2" />
+            <MudSelect T="Role" @bind-Value="_formRole" Label="Role" Variant="Variant.Outlined" Class="mb-2">
+                @foreach (Role role in Enum.GetValues<Role>())
+                {
+                    <MudSelectItem T="Role" Value="@role">@role</MudSelectItem>
+                }
+            </MudSelect>
+            <MudStack Row="true" Spacing="2">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CreateUser">Send Invite</MudButton>
+                <MudButton Variant="Variant.Text" OnClick="CancelCreate">Cancel</MudButton>
+            </MudStack>
+        </MudPaper>
+    }
+
+    @if (_showEditRole)
+    {
+        <MudPaper Class="pa-4 mb-4" Elevation="2">
+            <MudText Typo="Typo.h6" Class="mb-2">Edit Role — @_editingUser?.Name</MudText>
+            <MudSelect T="Role" @bind-Value="_editRole" Label="Role" Variant="Variant.Outlined" Class="mb-2">
+                @foreach (Role role in Enum.GetValues<Role>())
+                {
+                    <MudSelectItem T="Role" Value="@role">@role</MudSelectItem>
+                }
+            </MudSelect>
+            <MudStack Row="true" Spacing="2">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveRole">Save</MudButton>
+                <MudButton Variant="Variant.Text" OnClick="CancelEditRole">Cancel</MudButton>
+            </MudStack>
+        </MudPaper>
+    }
+
+    @if (_loading)
+    {
+        <MudProgressCircular Indeterminate="true" />
+    }
+    else
+    {
+        <MudTable Items="_users" Hover="true" Dense="true">
+            <HeaderContent>
+                <MudTh>Name</MudTh>
+                <MudTh>Email</MudTh>
+                <MudTh>Role</MudTh>
+                <MudTh>Status</MudTh>
+                <MudTh>Linked Worker</MudTh>
+                <MudTh>Actions</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.Name</MudTd>
+                <MudTd>@context.Email</MudTd>
+                <MudTd>@context.RoleValue</MudTd>
+                <MudTd>
+                    <MudChip T="string" Color="@(context.IsActive ? Color.Success : Color.Default)" Size="Size.Small">
+                        @(context.IsActive ? "Active" : "Inactive")
+                    </MudChip>
+                </MudTd>
+                <MudTd>@GetWorkerName(context.WorkerId)</MudTd>
+                <MudTd>
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
+                                   OnClick="@(() => StartEditRole(context))" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Email" Size="Size.Small" Color="Color.Primary"
+                                   Title="Resend Invite"
+                                   OnClick="@(() => ResendInvite(context))" />
+                    @if (context.IsActive)
+                    {
+                        <MudIconButton Icon="@Icons.Material.Filled.PersonOff" Size="Size.Small" Color="Color.Error"
+                                       OnClick="@(() => DeactivateUser(context))" />
+                    }
+                    else
+                    {
+                        <MudIconButton Icon="@Icons.Material.Filled.PersonAdd" Size="Size.Small" Color="Color.Success"
+                                       OnClick="@(() => ReactivateUser(context))" />
+                    }
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</RoleGuard>
+
+@code {
+    private List<UserProfile> _users = new();
+    private List<Worker> _workers = new();
+    private bool _loading = true;
+
+    // Create form state
+    private bool _showCreateForm;
+    private string _formName = string.Empty;
+    private string _formEmail = string.Empty;
+    private Role _formRole = Role.Worker;
+    private Guid? _formWorkerId;
+
+    // Edit role state
+    private bool _showEditRole;
+    private UserProfile? _editingUser;
+    private Role _editRole = Role.Worker;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        _loading = true;
+        _users = await UserService.GetAllAsync();
+        _workers = await WorkerService.GetActiveAsync();
+        _loading = false;
+    }
+
+    private void ShowCreateForm()
+    {
+        _formName = string.Empty;
+        _formEmail = string.Empty;
+        _formRole = Role.Worker;
+        _formWorkerId = null;
+        _showCreateForm = true;
+        _showEditRole = false;
+    }
+
+    private void CancelCreate() => _showCreateForm = false;
+
+    private async Task CreateUser()
+    {
+        if (string.IsNullOrWhiteSpace(_formName))
+        {
+            Snackbar.Add("Name is required.", Severity.Error);
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_formEmail))
+        {
+            Snackbar.Add("Email is required.", Severity.Error);
+            return;
+        }
+
+        var userProfile = new UserProfile
+        {
+            Name = _formName.Trim(),
+            Email = _formEmail.Trim(),
+            RoleValue = _formRole.ToString(),
+            WorkerId = _formWorkerId,
+            IsActive = true
+        };
+
+        try
+        {
+            await UserService.CreateAsync(userProfile, _formEmail.Trim());
+            Snackbar.Add("User created and invite sent.", Severity.Success);
+            _showCreateForm = false;
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error creating user: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void StartEditRole(UserProfile user)
+    {
+        _editingUser = user;
+        _editRole = Enum.TryParse<Role>(user.RoleValue, out var r) ? r : Role.Worker;
+        _showEditRole = true;
+        _showCreateForm = false;
+    }
+
+    private void CancelEditRole() => _showEditRole = false;
+
+    private async Task SaveRole()
+    {
+        if (_editingUser == null) return;
+
+        try
+        {
+            await UserService.UpdateRoleAsync(_editingUser.Id, _editRole);
+            Snackbar.Add($"Role updated to {_editRole}.", Severity.Success);
+            _showEditRole = false;
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error updating role: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task DeactivateUser(UserProfile user)
+    {
+        try
+        {
+            await UserService.DeactivateAsync(user.Id);
+            Snackbar.Add($"{user.Name} deactivated.", Severity.Info);
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error deactivating user: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task ReactivateUser(UserProfile user)
+    {
+        try
+        {
+            await UserService.ReactivateAsync(user.Id);
+            Snackbar.Add($"{user.Name} reactivated.", Severity.Success);
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error reactivating user: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private string GetWorkerName(Guid? workerId)
+    {
+        if (workerId == null) return "—";
+        var worker = _workers.FirstOrDefault(w => w.Id == workerId);
+        return worker?.Name ?? "Unknown";
+    }
+
+    private async Task ResendInvite(UserProfile user)
+    {
+        try
+        {
+            await UserService.ResendInviteAsync(user.Email);
+            Snackbar.Add($"Invite resent to {user.Email}.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error resending invite: {ex.Message}", Severity.Error);
+        }
+    }
+}

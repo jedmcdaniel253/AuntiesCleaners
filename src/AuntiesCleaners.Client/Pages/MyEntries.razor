@@ -1,0 +1,173 @@
+@page "/my-entries"
+@using AuntiesCleaners.Client.Models
+@using AuntiesCleaners.Client.Services
+@using AuntiesCleaners.Client.Shared
+@inject IWorkEntryService WorkEntryService
+@inject IAuthService AuthService
+@inject IWorkerService WorkerService
+@inject IHouseService HouseService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<MudText Typo="Typo.h5" Class="mb-4">My Entries</MudText>
+
+<DateNavigator Date="_selectedDate" DateChanged="OnDateChanged" />
+
+<MudDivider Class="my-4" />
+
+@if (_loading)
+{
+    <MudProgressCircular Indeterminate="true" Class="d-flex mx-auto my-8" />
+}
+else if (!_entries.Any())
+{
+    <MudAlert Severity="Severity.Info" Class="mt-4">No entries found for this date.</MudAlert>
+}
+else
+{
+    <MudTable Items="_entries" Hover="true" Dense="true" Striped="true" Class="mt-4">
+        <HeaderContent>
+            <MudTh>Worker</MudTh>
+            <MudTh>House</MudTh>
+            <MudTh>Category</MudTh>
+            <MudTh>Hours/Loads</MudTh>
+            <MudTh>Actions</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Worker">@GetWorkerName(context.WorkerId)</MudTd>
+            <MudTd DataLabel="House">@GetHouseName(context.HouseId)</MudTd>
+            <MudTd DataLabel="Category">@context.WorkCategoryValue</MudTd>
+            <MudTd DataLabel="Hours/Loads">@GetHoursLoadsDisplay(context)</MudTd>
+            <MudTd>
+                <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
+                               OnClick="@(() => OpenEditDialog(context))" aria-label="Edit entry" />
+                <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
+                               Color="Color.Error"
+                               OnClick="@(() => ConfirmDelete(context))" aria-label="Delete entry" />
+            </MudTd>
+        </RowTemplate>
+    </MudTable>
+}
+
+@code {
+    private DateTime? _selectedDate = DateTime.Today;
+    private List<WorkEntry> _entries = new();
+    private Dictionary<Guid, string> _workerNames = new();
+    private Dictionary<Guid, string> _houseNames = new();
+    private List<Worker> _workers = new();
+    private List<House> _houses = new();
+    private bool _loading = true;
+    private Role? _currentRole;
+    private Guid? _currentWorkerId;
+    private Guid? _currentUserProfileId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _currentRole = await AuthService.GetCurrentRoleAsync();
+        _currentWorkerId = await AuthService.GetCurrentWorkerIdAsync();
+        _currentUserProfileId = await AuthService.GetCurrentUserProfileIdAsync();
+
+        _workers = await WorkerService.GetActiveAsync();
+        _houses = await HouseService.GetActiveAsync();
+
+        _workerNames = _workers.ToDictionary(w => w.Id, w => w.Name);
+        _houseNames = _houses.ToDictionary(h => h.Id, h => h.Name);
+
+        await LoadEntries();
+    }
+
+    private async Task OnDateChanged(DateTime? newDate)
+    {
+        _selectedDate = newDate;
+        await LoadEntries();
+    }
+
+    private async Task LoadEntries()
+    {
+        _loading = true;
+        StateHasChanged();
+
+        var date = _selectedDate ?? DateTime.Today;
+        var allEntries = await WorkEntryService.GetByDateAsync(date);
+
+        // Worker_Role visibility filter: only show entries where worker_id = user's worker OR created_by = user
+        if (_currentRole == Role.Worker)
+        {
+            _entries = allEntries.Where(e =>
+                (_currentWorkerId.HasValue && e.WorkerId == _currentWorkerId.Value) ||
+                (_currentUserProfileId.HasValue && e.CreatedBy == _currentUserProfileId.Value)
+            ).ToList();
+        }
+        else
+        {
+            // Manager, Boss, Admin see all entries
+            _entries = allEntries;
+        }
+
+        _loading = false;
+        StateHasChanged();
+    }
+
+    private string GetWorkerName(Guid workerId) =>
+        _workerNames.TryGetValue(workerId, out var name) ? name : "Unknown";
+
+    private string GetHouseName(Guid houseId) =>
+        _houseNames.TryGetValue(houseId, out var name) ? name : "Unknown";
+
+    private string GetHoursLoadsDisplay(WorkEntry entry)
+    {
+        if (entry.WorkCategoryValue == WorkCategory.Cleaning.ToString() ||
+            entry.WorkCategoryValue == WorkCategory.Maintenance.ToString())
+        {
+            return entry.HoursBilled?.ToString("0.##") + " hrs" ?? "-";
+        }
+        if (entry.WorkCategoryValue == WorkCategory.Laundry.ToString())
+        {
+            return entry.NumberOfLoads?.ToString() + " loads" ?? "-";
+        }
+        return "-";
+    }
+
+    private async Task OpenEditDialog(WorkEntry entry)
+    {
+        var category = Enum.TryParse<WorkCategory>(entry.WorkCategoryValue, out var cat) ? cat : WorkCategory.Cleaning;
+
+        var parameters = new DialogParameters<EditWorkEntryDialog>
+        {
+            { x => x.Entry, entry },
+            { x => x.Category, category },
+            { x => x.Workers, _workers },
+            { x => x.Houses, _houses }
+        };
+
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<EditWorkEntryDialog>("Edit Entry", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is not null && !result.Canceled)
+        {
+            await LoadEntries();
+            Snackbar.Add("Entry updated", Severity.Success);
+        }
+    }
+
+    private async Task ConfirmDelete(WorkEntry entry)
+    {
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { x => x.ContentText, "Are you sure you want to delete this entry?" },
+            { x => x.ButtonText, "Delete" },
+            { x => x.Color, Color.Error }
+        };
+
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Delete Entry", parameters);
+        var result = await dialog.Result;
+
+        if (result is not null && !result.Canceled)
+        {
+            await WorkEntryService.DeleteAsync(entry.Id);
+            await LoadEntries();
+            Snackbar.Add("Entry deleted", Severity.Success);
+        }
+    }
+}

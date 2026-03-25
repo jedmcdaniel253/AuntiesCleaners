@@ -1,0 +1,108 @@
+@using AuntiesCleaners.Client.Models
+@using AuntiesCleaners.Client.Services
+@inject IWorkEntryService WorkEntryService
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form">
+            <MudStack Spacing="3">
+                <MudSelect T="Guid" Label="Worker" @bind-Value="_workerId" Variant="Variant.Outlined"
+                           Required="true" RequiredError="Worker is required">
+                    @foreach (var worker in Workers)
+                    {
+                        <MudSelectItem T="Guid" Value="@worker.Id">@worker.Name</MudSelectItem>
+                    }
+                </MudSelect>
+
+                <MudDatePicker Label="Date" @bind-Date="_entryDate" Variant="Variant.Outlined"
+                               Required="true" RequiredError="Date is required" />
+
+                <MudSelect T="Guid" Label="House" @bind-Value="_houseId" Variant="Variant.Outlined"
+                           Required="true" RequiredError="House is required">
+                    @foreach (var house in _filteredHouses)
+                    {
+                        <MudSelectItem T="Guid" Value="@house.Id">@house.Name</MudSelectItem>
+                    }
+                </MudSelect>
+
+                @if (Category == WorkCategory.Cleaning || Category == WorkCategory.Maintenance)
+                {
+                    <MudNumericField T="decimal" Label="Hours Billed" @bind-Value="_hoursBilled"
+                                     Variant="Variant.Outlined" Min="0"
+                                     Required="true" RequiredError="Hours Billed is required" />
+                }
+                else if (Category == WorkCategory.Laundry)
+                {
+                    <MudNumericField T="int" Label="Number of Loads" @bind-Value="_numberOfLoads"
+                                     Variant="Variant.Outlined" Min="0"
+                                     Required="true" RequiredError="Number of Loads is required" />
+                }
+            </MudStack>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Save">Save</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter] public WorkEntry Entry { get; set; } = null!;
+    [Parameter] public WorkCategory Category { get; set; }
+    [Parameter] public List<Worker> Workers { get; set; } = new();
+    [Parameter] public List<House> Houses { get; set; } = new();
+
+    private MudForm _form = null!;
+    private Guid _workerId;
+    private DateTime? _entryDate;
+    private Guid _houseId;
+    private decimal _hoursBilled;
+    private int _numberOfLoads;
+    private List<House> _filteredHouses = new();
+
+    protected override void OnInitialized()
+    {
+        _workerId = Entry.WorkerId;
+        _entryDate = Entry.EntryDate;
+        _houseId = Entry.HouseId;
+        _hoursBilled = Entry.HoursBilled ?? 0;
+        _numberOfLoads = Entry.NumberOfLoads ?? 0;
+
+        // Lawn excludes Multiple Houses
+        if (Category == WorkCategory.Lawn)
+        {
+            _filteredHouses = Houses.Where(h => !h.IsMultipleHouses).OrderBy(h => h.Name).ToList();
+        }
+        else
+        {
+            _filteredHouses = Houses.OrderByDescending(h => h.IsMultipleHouses).ThenBy(h => h.Name).ToList();
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Save()
+    {
+        await _form.ValidateAsync();
+        if (!_form.IsValid)
+            return;
+
+        Entry.WorkerId = _workerId;
+        Entry.EntryDate = _entryDate?.Date ?? DateTime.Today;
+        Entry.HouseId = _houseId;
+
+        if (Category == WorkCategory.Cleaning || Category == WorkCategory.Maintenance)
+        {
+            Entry.HoursBilled = _hoursBilled;
+        }
+        else if (Category == WorkCategory.Laundry)
+        {
+            Entry.NumberOfLoads = _numberOfLoads;
+        }
+
+        await WorkEntryService.UpdateAsync(Entry);
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+}

@@ -1,0 +1,119 @@
+@page "/houses"
+@using AuntiesCleaners.Client.Models
+@using AuntiesCleaners.Client.Services
+@using AuntiesCleaners.Client.Shared
+@inject IHouseService HouseService
+@inject ISnackbar Snackbar
+
+<RoleGuard AllowedRoles="@(new[] { Role.Boss, Role.Admin })">
+    <MudText Typo="Typo.h5" Class="mb-4">Houses</MudText>
+
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mb-4" OnClick="ShowAddForm">
+        Add House
+    </MudButton>
+
+    @if (_showForm)
+    {
+        <MudPaper Class="pa-4 mb-4" Elevation="2">
+            <MudText Typo="Typo.h6" Class="mb-2">@(_editingHouse?.Id != Guid.Empty ? "Edit" : "Add") House</MudText>
+            <MudTextField @bind-Value="_formName" Label="Name / Address" Variant="Variant.Outlined" Class="mb-2" />
+            <MudStack Row="true" Spacing="2">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveHouse">Save</MudButton>
+                <MudButton Variant="Variant.Text" OnClick="@(() => _showForm = false)">Cancel</MudButton>
+            </MudStack>
+        </MudPaper>
+    }
+
+    <MudTable Items="_houses" Hover="true" Dense="true">
+        <HeaderContent>
+            <MudTh>Name</MudTh>
+            <MudTh>Status</MudTh>
+            <MudTh>Actions</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd>
+                @context.Name
+                @if (context.IsMultipleHouses)
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Info" Class="ml-2">System</MudChip>
+                }
+            </MudTd>
+            <MudTd>
+                <MudChip T="string" Color="@(context.IsActive ? Color.Success : Color.Default)" Size="Size.Small">
+                    @(context.IsActive ? "Active" : "Inactive")
+                </MudChip>
+            </MudTd>
+            <MudTd>
+                @if (!context.IsMultipleHouses)
+                {
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" OnClick="@(() => EditHouse(context))" />
+                    @if (context.IsActive)
+                    {
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                       OnClick="@(() => DeactivateHouse(context))" />
+                    }
+                }
+            </MudTd>
+        </RowTemplate>
+    </MudTable>
+</RoleGuard>
+
+@code {
+    private List<House> _houses = new();
+    private bool _showForm;
+    private House? _editingHouse;
+    private string _formName = string.Empty;
+
+    protected override async Task OnInitializedAsync() => await LoadHouses();
+
+    private async Task LoadHouses()
+    {
+        _houses = await HouseService.GetAllAsync();
+    }
+
+    private void ShowAddForm()
+    {
+        _editingHouse = new House();
+        _formName = string.Empty;
+        _showForm = true;
+    }
+
+    private void EditHouse(House house)
+    {
+        _editingHouse = house;
+        _formName = house.Name;
+        _showForm = true;
+    }
+
+    private async Task SaveHouse()
+    {
+        if (string.IsNullOrWhiteSpace(_formName))
+        {
+            Snackbar.Add("Name is required.", Severity.Error);
+            return;
+        }
+
+        if (_editingHouse!.Id == Guid.Empty)
+        {
+            _editingHouse.Name = _formName;
+            await HouseService.CreateAsync(_editingHouse);
+            Snackbar.Add("House added.", Severity.Success);
+        }
+        else
+        {
+            _editingHouse.Name = _formName;
+            await HouseService.UpdateAsync(_editingHouse);
+            Snackbar.Add("House updated.", Severity.Success);
+        }
+
+        _showForm = false;
+        await LoadHouses();
+    }
+
+    private async Task DeactivateHouse(House house)
+    {
+        await HouseService.DeactivateAsync(house.Id);
+        Snackbar.Add($"{house.Name} deactivated.", Severity.Info);
+        await LoadHouses();
+    }
+}

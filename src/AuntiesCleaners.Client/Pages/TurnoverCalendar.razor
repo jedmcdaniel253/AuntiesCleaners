@@ -1,0 +1,300 @@
+@page "/calendar"
+@using AuntiesCleaners.Client.Models
+@using AuntiesCleaners.Client.Services
+@using AuntiesCleaners.Client.Shared
+@inject ITurnoverService TurnoverService
+@inject IHouseService HouseService
+@inject IAuthService AuthService
+@inject IShareService ShareService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<MudText Typo="Typo.h5" Class="mb-4">Turnover Calendar</MudText>
+
+@* Week navigation *@
+<MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Class="mb-4">
+    <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" OnClick="PreviousWeek" aria-label="Previous week" />
+    <MudText Typo="Typo.subtitle1">
+        @_weekStart.ToString("MMM d") — @_weekStart.AddDays(6).ToString("MMM d, yyyy")
+    </MudText>
+    <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" OnClick="NextWeek" aria-label="Next week" />
+    <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="GoToCurrentWeek">Today</MudButton>
+</MudStack>
+
+@* Weekly grid: rows = houses, columns = days *@
+<MudTable Items="@_houses" Hover="true" Dense="true" Breakpoint="Breakpoint.None">
+    <HeaderContent>
+        <MudTh>House</MudTh>
+        @for (int i = 0; i < 7; i++)
+        {
+            var day = _weekStart.AddDays(i);
+            var dayIndex = i;
+            <MudTh Style="cursor:pointer; text-align:center;" @onclick="@(() => ShowDayDrillDown(day, null))">
+                <MudText Typo="Typo.caption">@day.ToString("ddd")</MudText>
+                <MudText Typo="Typo.body2" Style="@(day.Date == DateTime.Today ? "font-weight:bold; color:var(--mud-palette-primary);" : "")">
+                    @day.Day
+                </MudText>
+            </MudTh>
+        }
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd>@context.Name</MudTd>
+        @for (int i = 0; i < 7; i++)
+        {
+            var day = _weekStart.AddDays(i);
+            var eventsForCell = GetEventsForHouseAndDay(context.Id, day);
+            <MudTd Style="text-align:center; cursor:pointer;" @onclick="@(() => ShowDayDrillDown(day, context.Id))">
+                @foreach (var evt in eventsForCell)
+                {
+                    <MudChip T="string" Size="Size.Small" Color="@GetEventColor(evt)" Variant="Variant.Filled" Style="margin:1px;">
+                        @evt.DisplayLabel
+                    </MudChip>
+                }
+            </MudTd>
+        }
+    </RowTemplate>
+</MudTable>
+
+@* Day drill-down dialog content *@
+@if (_showDayDrillDown)
+{
+    <MudPaper Class="pa-4 mt-4" Elevation="2">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-3">
+            <MudText Typo="Typo.h6">@FormatDayLabel(_selectedDay)</MudText>
+            <MudStack Row="true" Spacing="1">
+                @if (_dayEvents.Any())
+                {
+                    <RoleGuard AllowedRoles="@(new[] { Role.Manager, Role.Boss, Role.Admin })">
+                        <MudIconButton Icon="@Icons.Material.Filled.Share" OnClick="ShareDaySchedule" aria-label="Share day schedule" />
+                    </RoleGuard>
+                }
+                <MudIconButton Icon="@Icons.Material.Filled.Close" OnClick="@(() => _showDayDrillDown = false)" aria-label="Close" />
+            </MudStack>
+        </MudStack>
+
+        @if (!_dayEvents.Any())
+        {
+            <MudText Typo="Typo.body2" Color="Color.Secondary">No turnover entries for this day.</MudText>
+        }
+        else
+        {
+            <MudTable Items="@_dayEvents" Hover="true" Dense="true">
+                <HeaderContent>
+                    <MudTh>House</MudTh>
+                    <MudTh>Type</MudTh>
+                    <MudTh>Notes</MudTh>
+                    <MudTh>Actions</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@GetHouseName(context.HouseId)</MudTd>
+                    <MudTd>
+                        <MudChip T="string" Size="Size.Small" Color="@GetEventColor(context)" Variant="Variant.Filled">
+                            @context.DisplayLabel
+                        </MudChip>
+                    </MudTd>
+                    <MudTd>@(context.Notes ?? "—")</MudTd>
+                    <MudTd>
+                        <RoleGuard AllowedRoles="@(new[] { Role.Manager, Role.Boss, Role.Admin })">
+                            <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
+                                           OnClick="@(() => EditEvent(context))" aria-label="Edit" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                           OnClick="@(() => DeleteEvent(context))" aria-label="Delete" />
+                        </RoleGuard>
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+
+        <RoleGuard AllowedRoles="@(new[] { Role.Manager, Role.Boss, Role.Admin })">
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" Class="mt-3"
+                       OnClick="@(() => ShowAddForm(_selectedDay))">
+                Add Entry
+            </MudButton>
+        </RoleGuard>
+    </MudPaper>
+}
+
+@* Add/Edit form *@
+@if (_showEntryForm)
+{
+    <MudPaper Class="pa-4 mt-4" Elevation="2">
+        <MudText Typo="Typo.h6" Class="mb-3">@(_editingEvent != null ? "Edit" : "Add") Turnover Entry</MudText>
+        <TurnoverEntryForm Event="@_formEvent"
+                           OnSubmitted="OnFormSubmitted"
+                           OnCancelled="@(() => _showEntryForm = false)" />
+    </MudPaper>
+}
+
+@code {
+    private DateTime _weekStart;
+    private List<House> _houses = new();
+    private List<TurnoverEvent> _weekEvents = new();
+
+    // Day drill-down state
+    private bool _showDayDrillDown;
+    private DateTime _selectedDay;
+    private Guid? _selectedHouseId;
+    private List<TurnoverEvent> _dayEvents = new();
+
+    // Entry form state
+    private bool _showEntryForm;
+    private TurnoverEvent? _editingEvent;
+    private TurnoverEvent _formEvent = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _weekStart = GetMondayOfWeek(DateTime.Today);
+        await LoadData();
+    }
+
+    private static DateTime GetMondayOfWeek(DateTime date)
+    {
+        var diff = (7 + (date.DayOfWeek - DayOfWeek.Monday)) % 7;
+        return date.Date.AddDays(-diff);
+    }
+
+    private async Task LoadData()
+    {
+        _houses = (await HouseService.GetActiveAsync())
+            .Where(h => !h.IsMultipleHouses)
+            .OrderBy(h => h.Name)
+            .ToList();
+        _weekEvents = await TurnoverService.GetByWeekAsync(_weekStart);
+    }
+
+    private async Task PreviousWeek()
+    {
+        _weekStart = _weekStart.AddDays(-7);
+        await LoadData();
+    }
+
+    private async Task NextWeek()
+    {
+        _weekStart = _weekStart.AddDays(7);
+        await LoadData();
+    }
+
+    private async Task GoToCurrentWeek()
+    {
+        _weekStart = GetMondayOfWeek(DateTime.Today);
+        await LoadData();
+    }
+
+    private List<TurnoverEvent> GetEventsForHouseAndDay(Guid houseId, DateTime day) =>
+        _weekEvents.Where(e => e.HouseId == houseId && e.EventDate.Date == day.Date).ToList();
+
+    private static Color GetEventColor(TurnoverEvent evt) =>
+        evt.IsFlip ? Color.Warning : evt.IsCheckout ? Color.Error : Color.Success;
+
+    private string GetHouseName(Guid houseId) =>
+        _houses.FirstOrDefault(h => h.Id == houseId)?.Name ?? "Unknown";
+
+    // Day drill-down
+    private void ShowDayDrillDown(DateTime day, Guid? houseId)
+    {
+        _selectedDay = day;
+        _selectedHouseId = houseId;
+        _dayEvents = _weekEvents.Where(e => e.EventDate.Date == day.Date).ToList();
+        _showDayDrillDown = true;
+        _showEntryForm = false;
+    }
+
+    private string FormatDayLabel(DateTime day)
+    {
+        var dateStr = day.ToString("M/d/yy");
+        if (day.Date == DateTime.Today) return $"Today ({dateStr})";
+        if (day.Date == DateTime.Today.AddDays(1)) return $"Tomorrow ({dateStr})";
+        return $"{day:dddd} ({dateStr})";
+    }
+
+    // CRUD
+    private void ShowAddForm(DateTime day)
+    {
+        _editingEvent = null;
+        _formEvent = new TurnoverEvent
+        {
+            EventDate = day,
+            HouseId = _selectedHouseId ?? Guid.Empty
+        };
+        _showEntryForm = true;
+    }
+
+    private void EditEvent(TurnoverEvent evt)
+    {
+        _editingEvent = evt;
+        _formEvent = new TurnoverEvent
+        {
+            Id = evt.Id,
+            HouseId = evt.HouseId,
+            EventDate = evt.EventDate,
+            IsCheckout = evt.IsCheckout,
+            IsCheckin = evt.IsCheckin,
+            Notes = evt.Notes,
+            CreatedBy = evt.CreatedBy,
+            CreatedAt = evt.CreatedAt
+        };
+        _showEntryForm = true;
+    }
+
+    private async Task DeleteEvent(TurnoverEvent evt)
+    {
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { x => x.ContentText, $"Delete turnover entry for {GetHouseName(evt.HouseId)}?" },
+            { x => x.ButtonText, "Delete" },
+            { x => x.Color, Color.Error }
+        };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Confirm Delete", parameters);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled)
+        {
+            await TurnoverService.DeleteAsync(evt.Id);
+            Snackbar.Add("Turnover entry deleted.", Severity.Success);
+            await LoadData();
+            ShowDayDrillDown(_selectedDay, _selectedHouseId);
+        }
+    }
+
+    private async Task OnFormSubmitted()
+    {
+        try
+        {
+            if (_editingEvent != null)
+            {
+                await TurnoverService.UpdateAsync(_formEvent);
+                Snackbar.Add("Turnover entry updated.", Severity.Success);
+            }
+            else
+            {
+                await TurnoverService.CreateAsync(_formEvent);
+                Snackbar.Add("Turnover entry added.", Severity.Success);
+            }
+            _showEntryForm = false;
+            await LoadData();
+            ShowDayDrillDown(_selectedDay, _selectedHouseId);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+    }
+
+    // Share
+    private async Task ShareDaySchedule()
+    {
+        var canShare = await ShareService.CanShareAsync();
+        if (!canShare)
+        {
+            Snackbar.Add("Sharing is not supported on this device.", Severity.Warning);
+            return;
+        }
+
+        var label = FormatDayLabel(_selectedDay);
+        var lines = _dayEvents
+            .Select(e => $"{GetHouseName(e.HouseId)} → {e.DisplayLabel}")
+            .ToList();
+        var text = $"{label}\n{string.Join("\n", lines)}";
+
+        await ShareService.ShareTextAsync("Turnover Schedule", text);
+    }
+}

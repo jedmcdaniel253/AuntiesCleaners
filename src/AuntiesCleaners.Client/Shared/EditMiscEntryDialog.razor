@@ -1,0 +1,91 @@
+@using AuntiesCleaners.Client.Models
+@using AuntiesCleaners.Client.Services
+@inject IMiscEntryService MiscEntryService
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form">
+            <MudStack Spacing="3">
+                <MudSelect T="Guid" Label="Worker" @bind-Value="_workerId" Variant="Variant.Outlined"
+                           Required="true" RequiredError="Worker is required">
+                    @foreach (var worker in Workers)
+                    {
+                        <MudSelectItem T="Guid" Value="@worker.Id">@worker.Name</MudSelectItem>
+                    }
+                </MudSelect>
+
+                <MudSelect T="Guid" Label="House (Optional)" @bind-Value="_houseId" Variant="Variant.Outlined"
+                           Clearable="true">
+                    @foreach (var house in Houses)
+                    {
+                        <MudSelectItem T="Guid" Value="@house.Id">@house.Name</MudSelectItem>
+                    }
+                </MudSelect>
+
+                <MudDatePicker Label="Date" @bind-Date="_entryDate" Variant="Variant.Outlined"
+                               Required="true" RequiredError="Date is required" />
+
+                <MudTextField T="string" Label="Description" @bind-Value="_description"
+                              Variant="Variant.Outlined"
+                              Required="true" RequiredError="Description is required" />
+
+                <MudNumericField T="decimal" Label="Charge Amount" @bind-Value="_chargeAmount"
+                                 Variant="Variant.Outlined" Min="0.01M"
+                                 Required="true" RequiredError="Charge Amount is required" />
+
+                <MudNumericField T="decimal" Label="Worker Pay Amount" @bind-Value="_payAmount"
+                                 Variant="Variant.Outlined" Min="0.01M"
+                                 Required="true" RequiredError="Worker Pay Amount is required" />
+            </MudStack>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Save">Save</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter] public MiscellaneousEntry Entry { get; set; } = null!;
+    [Parameter] public List<Worker> Workers { get; set; } = new();
+    [Parameter] public List<House> Houses { get; set; } = new();
+
+    private MudForm _form = null!;
+    private Guid _workerId;
+    private Guid _houseId;
+    private DateTime? _entryDate;
+    private string _description = string.Empty;
+    private decimal _chargeAmount;
+    private decimal _payAmount;
+
+    protected override void OnInitialized()
+    {
+        _workerId = Entry.WorkerId;
+        _houseId = Entry.HouseId ?? Guid.Empty;
+        _entryDate = Entry.EntryDate;
+        _description = Entry.Description;
+        _chargeAmount = Entry.ChargeAmount;
+        _payAmount = Entry.PayAmount;
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Save()
+    {
+        await _form.ValidateAsync();
+        if (!_form.IsValid)
+            return;
+
+        Entry.WorkerId = _workerId;
+        Entry.HouseId = _houseId == Guid.Empty ? null : _houseId;
+        Entry.EntryDate = _entryDate?.Date ?? DateTime.Today;
+        Entry.Description = _description;
+        Entry.ChargeAmount = _chargeAmount;
+        Entry.PayAmount = _payAmount;
+
+        await MiscEntryService.UpdateAsync(Entry);
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+}

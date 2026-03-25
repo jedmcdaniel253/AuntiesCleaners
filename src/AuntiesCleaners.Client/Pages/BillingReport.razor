@@ -1,0 +1,181 @@
+@page "/billing-report"
+@using AuntiesCleaners.Client.Models
+@using AuntiesCleaners.Client.Services
+@using AuntiesCleaners.Client.Shared
+@inject IBillingReportService BillingReportService
+@inject IPdfService PdfService
+@inject IEmailService EmailService
+@inject IOwnerService OwnerService
+@inject IReceiptService ReceiptService
+@inject HttpClient HttpClient
+@inject ISnackbar Snackbar
+
+<RoleGuard AllowedRoles="@(new[] { Role.Boss, Role.Admin })">
+    <MudText Typo="Typo.h5" Class="mb-4">Billing Report</MudText>
+
+    <MudPaper Class="pa-4 mb-4" Elevation="1">
+        <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+            <MudDatePicker Label="From Date" @bind-Date="_fromDate" Variant="Variant.Outlined" Style="max-width:200px" />
+            <MudDatePicker Label="To Date" @bind-Date="_toDate" Variant="Variant.Outlined" Style="max-width:200px" />
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="GenerateReport" Disabled="_loading">
+                @if (_loading) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+                Generate
+            </MudButton>
+        </MudStack>
+    </MudPaper>
+
+    @if (_report != null)
+    {
+        @if (_report.Sections.Count == 0)
+        {
+            <MudAlert Severity="Severity.Info" Class="mb-4">No records found for the selected period.</MudAlert>
+        }
+        else
+        {
+            <div id="billing-report-content">
+                @foreach (var reportSection in _report.Sections)
+                {
+                    <MudPaper Class="pa-4 mb-3" Elevation="1">
+                        <MudText Typo="Typo.h6" Class="mb-2">@reportSection.Name</MudText>
+                        <MudTable Items="@reportSection.LineItems" Hover="true" Dense="true">
+                            <HeaderContent>
+                                <MudTh>Description</MudTh>
+                                <MudTh Style="text-align:right">Amount</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd>@context.Description</MudTd>
+                                <MudTd Style="text-align:right">@context.Amount.ToString("C2")</MudTd>
+                            </RowTemplate>
+                        </MudTable>
+                        <MudStack Row="true" Justify="Justify.FlexEnd" Class="mt-2">
+                            <MudText Typo="Typo.subtitle1"><strong>Subtotal: @reportSection.Subtotal.ToString("C2")</strong></MudText>
+                        </MudStack>
+                    </MudPaper>
+                }
+
+                <MudPaper Class="pa-4 mb-3" Elevation="2">
+                    <MudStack Row="true" Justify="Justify.FlexEnd">
+                        <MudText Typo="Typo.h5"><strong>Grand Total: @_report.GrandTotal.ToString("C2")</strong></MudText>
+                    </MudStack>
+                </MudPaper>
+
+                <MudStack Row="true" Spacing="2" Class="mb-4">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.PictureAsPdf"
+                               OnClick="ExportPdf" Disabled="_sending">Export PDF</MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.Email"
+                               OnClick="SendToOwner" Disabled="_sending">
+                        @if (_sending) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+                        Send to Owner
+                    </MudButton>
+                </MudStack>
+            </div>
+        }
+    }
+</RoleGuard>
+
+@code {
+    private DateTime? _fromDate = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+    private DateTime? _toDate = DateTime.Today;
+    private Models.BillingReport? _report;
+    private List<Receipt>? _receipts;
+    private bool _loading;
+    private bool _sending;
+
+    private async Task GenerateReport()
+    {
+        if (_fromDate == null || _toDate == null)
+        {
+            Snackbar.Add("Please select both From and To dates.", Severity.Warning);
+            return;
+        }
+
+        if (_fromDate > _toDate)
+        {
+            Snackbar.Add("From date must be before To date.", Severity.Warning);
+            return;
+        }
+
+        _loading = true;
+        try
+        {
+            _report = await BillingReportService.GenerateReportAsync(_fromDate.Value, _toDate.Value);
+            _receipts = await ReceiptService.GetByDateRangeAsync(_fromDate.Value, _toDate.Value);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error generating report: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task ExportPdf()
+    {
+        if (_report == null) return;
+        try
+        {
+            await PdfService.GenerateBillingReportPdfAsync(_report);
+            Snackbar.Add("PDF generated. Check your downloads.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error generating PDF: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task SendToOwner()
+    {
+        if (_report == null) return;
+        _sending = true;
+        try
+        {
+            var owner = await OwnerService.GetOwnerAsync();
+            if (owner == null || string.IsNullOrWhiteSpace(owner.Email))
+            {
+                Snackbar.Add("Owner email not configured. Please set up Owner contact first.", Severity.Warning);
+                return;
+            }
+
+            var pdfData = await PdfService.GenerateBillingReportPdfAsync(_report);
+
+            var attachments = new List<(string name, byte[] data)>();
+            if (_receipts != null)
+            {
+                for (int i = 0; i < _receipts.Count; i++)
+                {
+                    var receipt = _receipts[i];
+                    var refNum = $"R-{(i + 1):D3}";
+                    var safeName = receipt.BusinessName.Replace(" ", "_").Replace("/", "_");
+                    var fileName = $"{refNum}_{safeName}.jpg";
+
+                    if (!string.IsNullOrWhiteSpace(receipt.PhotoUrl))
+                    {
+                        try
+                        {
+                            var photoBytes = await HttpClient.GetByteArrayAsync(receipt.PhotoUrl);
+                            attachments.Add((fileName, photoBytes));
+                        }
+                        catch
+                        {
+                            // Skip photos that can't be fetched
+                        }
+                    }
+                }
+            }
+
+            var subject = $"Billing Report — {_report.DateFrom:MM/dd/yyyy} to {_report.DateTo:MM/dd/yyyy}";
+            await EmailService.SendBillingReportAsync(owner.Email, subject, pdfData, attachments);
+            Snackbar.Add("Billing report sent to owner.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error sending report: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _sending = false;
+        }
+    }
+}

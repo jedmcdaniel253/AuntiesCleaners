@@ -1,0 +1,130 @@
+@using AuntiesCleaners.Client.Models
+@using AuntiesCleaners.Client.Services
+@inject IAuthService AuthService
+@inject ITabConfigService TabConfigService
+@inject TabConfigNotifier Notifier
+@inject NavigationManager Navigation
+@implements IDisposable
+
+<MudPaper Elevation="4" Style="position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;">
+    <MudStack Row="true" Justify="Justify.SpaceEvenly" AlignItems="AlignItems.Center" Class="py-1">
+        @foreach (var tab in _visibleTabs)
+        {
+            var isActive = Navigation.Uri.Contains(tab.Route);
+            <MudButton Variant="Variant.Text"
+                       Color="@(isActive ? Color.Primary : Color.Default)"
+                       Size="Size.Small"
+                       OnClick="@(() => Navigation.NavigateTo(tab.Route))"
+                       Class="d-flex flex-column align-center"
+                       Style="min-width: 60px; text-transform: none; font-size: 0.65rem;">
+                <MudIcon Icon="@tab.Icon" Size="Size.Small" />
+                @tab.Name
+            </MudButton>
+        }
+        @if (_overflowTabs.Any())
+        {
+            <MudMenu Icon="@Icons.Material.Filled.MoreHoriz" Size="Size.Small" AnchorOrigin="Origin.TopCenter">
+                @foreach (var tab in _overflowTabs)
+                {
+                    <MudMenuItem OnClick="@(() => Navigation.NavigateTo(tab.Route))">
+                        <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+                            <MudIcon Icon="@tab.Icon" Size="Size.Small" />
+                            <MudText>@tab.Name</MudText>
+                        </MudStack>
+                    </MudMenuItem>
+                }
+            </MudMenu>
+        }
+    </MudStack>
+</MudPaper>
+
+@code {
+    private List<TabDefinition> _visibleTabs = new();
+    private List<TabDefinition> _overflowTabs = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        Notifier.OnTabConfigChanged += ReloadTabs;
+        Navigation.LocationChanged += OnLocationChanged;
+        await LoadTabs();
+    }
+
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    private async Task LoadTabs()
+    {
+        var role = await AuthService.GetCurrentRoleAsync();
+        if (role == null) return;
+
+        var profileId = await AuthService.GetCurrentUserProfileIdAsync();
+        Console.WriteLine($"[BottomNavBar] profileId={profileId}, role={role}");
+
+        if (profileId.HasValue)
+        {
+            var saved = await TabConfigService.GetTabsForUserAsync(profileId.Value);
+            Console.WriteLine($"[BottomNavBar] Loaded {saved.Count} saved tabs from DB");
+            foreach (var s in saved)
+                Console.WriteLine($"  tab={s.TabName}, order={s.DisplayOrder}, visible={s.IsVisible}");
+
+            if (saved.Any())
+            {
+                _visibleTabs = saved
+                    .Where(t => t.IsVisible && AllTabs.ByName.ContainsKey(t.TabName))
+                    .OrderBy(t => t.DisplayOrder)
+                    .Select(t => AllTabs.ByName[t.TabName])
+                    .ToList();
+
+                _overflowTabs = saved
+                    .Where(t => !t.IsVisible && AllTabs.ByName.ContainsKey(t.TabName))
+                    .OrderBy(t => t.DisplayOrder)
+                    .Select(t => AllTabs.ByName[t.TabName])
+                    .ToList();
+
+                return;
+            }
+        }
+
+        var (defaultVisible, defaultOverflow) = GetDefaultTabs(role.Value);
+        _visibleTabs = defaultVisible;
+        _overflowTabs = defaultOverflow;
+    }
+
+    private async Task ReloadTabs()
+    {
+        await LoadTabs();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private (List<TabDefinition> visible, List<TabDefinition> overflow) GetDefaultTabs(Role role)
+    {
+        return role switch
+        {
+            Role.Worker => (
+                new List<TabDefinition> { AllTabs.Cleaning, AllTabs.Calendar, AllTabs.MyEntries },
+                new List<TabDefinition> { AllTabs.Laundry, AllTabs.Maintenance, AllTabs.Lawn, AllTabs.Receipts, AllTabs.MowList }
+            ),
+            Role.Manager => (
+                new List<TabDefinition> { AllTabs.Cleaning, AllTabs.Calendar, AllTabs.Laundry, AllTabs.Receipts, AllTabs.MyEntries },
+                new List<TabDefinition> { AllTabs.Maintenance, AllTabs.Lawn, AllTabs.MowList, AllTabs.DailySummary }
+            ),
+            Role.Boss => (
+                new List<TabDefinition> { AllTabs.Cleaning, AllTabs.Calendar, AllTabs.Laundry, AllTabs.Receipts, AllTabs.MyEntries, AllTabs.DailySummary },
+                new List<TabDefinition> { AllTabs.Maintenance, AllTabs.Lawn, AllTabs.MowList, AllTabs.Rates, AllTabs.BillingReports, AllTabs.WorkerPay, AllTabs.OwnerContact, AllTabs.Workers, AllTabs.Houses, AllTabs.Users, AllTabs.TabConfig }
+            ),
+            Role.Admin => (
+                new List<TabDefinition> { AllTabs.Cleaning, AllTabs.Calendar, AllTabs.Laundry, AllTabs.Receipts, AllTabs.MyEntries, AllTabs.DailySummary, AllTabs.Workers, AllTabs.Houses, AllTabs.Rates },
+                new List<TabDefinition> { AllTabs.Maintenance, AllTabs.Lawn, AllTabs.MowList, AllTabs.BillingReports, AllTabs.WorkerPay, AllTabs.OwnerContact, AllTabs.Users, AllTabs.TabConfig }
+            ),
+            _ => (new(), new())
+        };
+    }
+
+    public void Dispose()
+    {
+        Notifier.OnTabConfigChanged -= ReloadTabs;
+        Navigation.LocationChanged -= OnLocationChanged;
+    }
+}

@@ -1,0 +1,110 @@
+@using AuntiesCleaners.Client.Models
+@using AuntiesCleaners.Client.Services
+@inject IMiscEntryService MiscEntryService
+@inject IAuthService AuthService
+@inject ISnackbar Snackbar
+
+<MudForm @ref="_form">
+    <MudStack Spacing="3">
+        @if (_workerKey > 0)
+        {
+            <WorkerDropdown @key="_workerKey" @bind-Value="_workerId" />
+        }
+
+        <HouseDropdown @bind-Value="_houseId" IncludeMultipleHouses="true" />
+
+        <MudDatePicker Label="Date" @bind-Date="_entryDate" Variant="Variant.Outlined"
+                       Required="true" RequiredError="Date is required" />
+
+        <MudTextField T="string" Label="Description" @bind-Value="_description"
+                      Variant="Variant.Outlined"
+                      Required="true" RequiredError="Description is required" />
+
+        <MudNumericField T="decimal" Label="Charge Amount" @bind-Value="_chargeAmount"
+                         Variant="Variant.Outlined" Min="0.01M"
+                         Required="true" RequiredError="Charge Amount is required" />
+
+        <MudNumericField T="decimal" Label="Worker Pay Amount" @bind-Value="_payAmount"
+                         Variant="Variant.Outlined" Min="0.01M"
+                         Required="true" RequiredError="Worker Pay Amount is required" />
+
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   OnClick="HandleSubmit" FullWidth="true">
+            @(_isEditMode ? "Update" : "Submit")
+        </MudButton>
+    </MudStack>
+</MudForm>
+
+@code {
+    [Parameter] public EventCallback OnSubmitted { get; set; }
+    [Parameter] public MiscellaneousEntry? EditEntry { get; set; }
+
+    private MudForm _form = null!;
+    private Guid _workerId;
+    private Guid _houseId;
+    private DateTime? _entryDate = DateTime.Today;
+    private string _description = string.Empty;
+    private decimal _chargeAmount;
+    private decimal _payAmount;
+    private int _workerKey = 1;
+    private bool _isEditMode;
+
+    protected override void OnParametersSet()
+    {
+        if (EditEntry != null)
+        {
+            _isEditMode = true;
+            _workerId = EditEntry.WorkerId;
+            _houseId = EditEntry.HouseId ?? Guid.Empty;
+            _entryDate = EditEntry.EntryDate;
+            _description = EditEntry.Description;
+            _chargeAmount = EditEntry.ChargeAmount;
+            _payAmount = EditEntry.PayAmount;
+        }
+    }
+
+    private async Task HandleSubmit()
+    {
+        await _form.ValidateAsync();
+        if (!_form.IsValid)
+            return;
+
+        if (_isEditMode && EditEntry != null)
+        {
+            EditEntry.WorkerId = _workerId;
+            EditEntry.HouseId = _houseId == Guid.Empty ? null : _houseId;
+            EditEntry.EntryDate = _entryDate?.Date ?? DateTime.Today;
+            EditEntry.Description = _description;
+            EditEntry.ChargeAmount = _chargeAmount;
+            EditEntry.PayAmount = _payAmount;
+
+            await MiscEntryService.UpdateAsync(EditEntry);
+            Snackbar.Add("Miscellaneous entry updated", Severity.Success);
+        }
+        else
+        {
+            var entry = new MiscellaneousEntry
+            {
+                WorkerId = _workerId,
+                HouseId = _houseId == Guid.Empty ? null : _houseId,
+                EntryDate = _entryDate?.Date ?? DateTime.Today,
+                Description = _description,
+                ChargeAmount = _chargeAmount,
+                PayAmount = _payAmount
+            };
+
+            await MiscEntryService.CreateAsync(entry);
+            Snackbar.Add("Miscellaneous entry saved", Severity.Success);
+        }
+
+        // Reset form
+        _entryDate = DateTime.Today;
+        _description = string.Empty;
+        _chargeAmount = 0;
+        _payAmount = 0;
+        _isEditMode = false;
+        _workerKey++;
+
+        await OnSubmitted.InvokeAsync();
+    }
+}

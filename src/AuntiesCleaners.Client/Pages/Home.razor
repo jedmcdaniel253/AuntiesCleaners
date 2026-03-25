@@ -1,0 +1,39 @@
+﻿@page "/"
+@using AuntiesCleaners.Client.Models
+@using AuntiesCleaners.Client.Services
+@using AuntiesCleaners.Client.Shared
+@inject IAuthService AuthService
+@inject ITabConfigService TabConfigService
+@inject NavigationManager Navigation
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        if (!AuthService.IsAuthenticated)
+        {
+            Navigation.NavigateTo("/login");
+            return;
+        }
+
+        var route = await GetFirstTabRouteAsync();
+        Navigation.NavigateTo(route);
+    }
+
+    private async Task<string> GetFirstTabRouteAsync()
+    {
+        var profileId = await AuthService.GetCurrentUserProfileIdAsync();
+        if (profileId.HasValue)
+        {
+            var saved = await TabConfigService.GetTabsForUserAsync(profileId.Value);
+            var firstVisible = saved
+                .Where(t => t.IsVisible && AllTabs.ByName.ContainsKey(t.TabName))
+                .OrderBy(t => t.DisplayOrder)
+                .FirstOrDefault();
+
+            if (firstVisible != null)
+                return AllTabs.ByName[firstVisible.TabName].Route;
+        }
+
+        return "/cleaning";
+    }
+}

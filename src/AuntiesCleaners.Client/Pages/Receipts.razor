@@ -1,0 +1,124 @@
+@page "/receipts"
+@using AuntiesCleaners.Client.Models
+@using AuntiesCleaners.Client.Services
+@using AuntiesCleaners.Client.Shared
+@inject IReceiptService ReceiptService
+@inject IAuthService AuthService
+@inject IShareService ShareService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="mt-4">
+    <MudText Typo="Typo.h5" Class="mb-4">Receipts</MudText>
+
+    <ReceiptForm OnSubmitted="OnReceiptSubmitted" />
+
+    <MudDivider Class="my-4" />
+
+    <MudText Typo="Typo.h6" Class="mb-2">Saved Receipts</MudText>
+
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else if (!_receipts.Any())
+    {
+        <MudText Typo="Typo.body2" Color="Color.Secondary">No receipts found.</MudText>
+    }
+    else
+    {
+        <MudStack Spacing="2">
+            @foreach (var receipt in _receipts)
+            {
+                <MudCard Outlined="true">
+                    <MudCardContent>
+                        <MudGrid>
+                            @if (!string.IsNullOrWhiteSpace(receipt.PhotoUrl))
+                            {
+                                <MudItem xs="3">
+                                    <MudImage Src="@receipt.PhotoUrl" Alt="Receipt photo"
+                                              Width="80" Height="80" ObjectFit="ObjectFit.Cover"
+                                              Class="rounded" />
+                                </MudItem>
+                            }
+                            <MudItem xs="@(!string.IsNullOrWhiteSpace(receipt.PhotoUrl) ? 9 : 12)">
+                                <MudText Typo="Typo.subtitle1">@receipt.BusinessName</MudText>
+                                <MudText Typo="Typo.body2">
+                                    @receipt.ReceiptDate.ToString("MM/dd/yyyy") — @receipt.Amount.ToString("C")
+                                </MudText>
+                                <MudChip T="string" Size="Size.Small"
+                                         Color="@(receipt.IsReimbursable ? Color.Success : Color.Default)">
+                                    @(receipt.IsReimbursable ? "Reimbursable" : "Non-reimbursable")
+                                </MudChip>
+                            </MudItem>
+                        </MudGrid>
+                    </MudCardContent>
+                    <MudCardActions>
+                        <MudIconButton Icon="@Icons.Material.Filled.Share" Color="Color.Primary"
+                                       OnClick="@(() => ShareReceipt(receipt))" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error"
+                                       OnClick="@(() => DeleteReceipt(receipt))" />
+                    </MudCardActions>
+                </MudCard>
+            }
+        </MudStack>
+    }
+</MudContainer>
+
+@code {
+    private List<Receipt> _receipts = new();
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadReceipts();
+    }
+
+    private async Task LoadReceipts()
+    {
+        _loading = true;
+        try
+        {
+            var workerId = await AuthService.GetCurrentWorkerIdAsync();
+            if (workerId.HasValue)
+            {
+                _receipts = await ReceiptService.GetByWorkerAsync(workerId.Value);
+            }
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task OnReceiptSubmitted()
+    {
+        await LoadReceipts();
+    }
+
+    private async Task ShareReceipt(Receipt receipt)
+    {
+        var text = $"Receipt: {receipt.BusinessName} - {receipt.Amount:C} on {receipt.ReceiptDate:MM/dd/yyyy}";
+        await ShareService.ShareTextAsync("Receipt", text);
+    }
+
+    private async Task DeleteReceipt(Receipt receipt)
+    {
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { x => x.ContentText, $"Delete receipt from {receipt.BusinessName}?" },
+            { x => x.ButtonText, "Delete" },
+            { x => x.Color, Color.Error }
+        };
+
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Confirm Delete", parameters);
+        var result = await dialog.Result;
+
+        if (result is not null && !result.Canceled)
+        {
+            await ReceiptService.DeleteAsync(receipt.Id);
+            Snackbar.Add("Receipt deleted", Severity.Success);
+            await LoadReceipts();
+        }
+    }
+}

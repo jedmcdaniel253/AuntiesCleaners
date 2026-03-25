@@ -1,0 +1,146 @@
+@page "/maintenance"
+@using AuntiesCleaners.Client.Models
+@using AuntiesCleaners.Client.Services
+@using AuntiesCleaners.Client.Shared
+@inject IMiscEntryService MiscEntryService
+@inject IWorkerService WorkerService
+@inject IHouseService HouseService
+@inject IAuthService AuthService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="mt-4">
+    <MudText Typo="Typo.h5" Class="mb-4">Maintenance Entry</MudText>
+    <WorkEntryForm Category="WorkCategory.Maintenance" />
+
+    <MudDivider Class="my-4" />
+    <MudText Typo="Typo.h6" Class="mb-2">Miscellaneous Entries</MudText>
+
+    <RoleGuard AllowedRoles="@(new[] { Role.Boss, Role.Admin })">
+        <MiscEntryForm OnSubmitted="LoadMiscEntries" />
+        <MudDivider Class="my-4" />
+    </RoleGuard>
+
+    @if (_loadingMisc)
+    {
+        <MudProgressCircular Indeterminate="true" Class="d-flex mx-auto my-4" />
+    }
+    else if (!_miscEntries.Any())
+    {
+        <MudAlert Severity="Severity.Info" Class="mt-2">No miscellaneous entries for today.</MudAlert>
+    }
+    else
+    {
+        <MudTable Items="_miscEntries" Hover="true" Dense="true" Striped="true" Class="mt-2">
+            <HeaderContent>
+                <MudTh>Worker</MudTh>
+                <MudTh>House</MudTh>
+                <MudTh>Description</MudTh>
+                <MudTh>Charge</MudTh>
+                <MudTh>Pay</MudTh>
+                @if (_isBossOrAdmin)
+                {
+                    <MudTh>Actions</MudTh>
+                }
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Worker">@GetWorkerName(context.WorkerId)</MudTd>
+                <MudTd DataLabel="House">@GetHouseName(context.HouseId)</MudTd>
+                <MudTd DataLabel="Description">@context.Description</MudTd>
+                <MudTd DataLabel="Charge">@context.ChargeAmount.ToString("C")</MudTd>
+                <MudTd DataLabel="Pay">@context.PayAmount.ToString("C")</MudTd>
+                @if (_isBossOrAdmin)
+                {
+                    <MudTd>
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
+                                       OnClick="@(() => OpenEditDialog(context))" aria-label="Edit misc entry" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
+                                       Color="Color.Error"
+                                       OnClick="@(() => ConfirmDelete(context))" aria-label="Delete misc entry" />
+                    </MudTd>
+                }
+            </RowTemplate>
+        </MudTable>
+    }
+</MudContainer>
+
+@code {
+    private List<MiscellaneousEntry> _miscEntries = new();
+    private Dictionary<Guid, string> _workerNames = new();
+    private Dictionary<Guid, string> _houseNames = new();
+    private List<Worker> _workers = new();
+    private List<House> _houses = new();
+    private bool _loadingMisc = true;
+    private bool _isBossOrAdmin;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var role = await AuthService.GetCurrentRoleAsync();
+        _isBossOrAdmin = role is Role.Boss or Role.Admin;
+
+        _workers = await WorkerService.GetActiveAsync();
+        _houses = await HouseService.GetActiveAsync();
+
+        _workerNames = _workers.ToDictionary(w => w.Id, w => w.Name);
+        _houseNames = _houses.ToDictionary(h => h.Id, h => h.Name);
+
+        await LoadMiscEntries();
+    }
+
+    private async Task LoadMiscEntries()
+    {
+        _loadingMisc = true;
+        StateHasChanged();
+
+        _miscEntries = await MiscEntryService.GetByDateAsync(DateTime.Today);
+
+        _loadingMisc = false;
+        StateHasChanged();
+    }
+
+    private string GetWorkerName(Guid workerId) =>
+        _workerNames.TryGetValue(workerId, out var name) ? name : "Unknown";
+
+    private string GetHouseName(Guid? houseId) =>
+        houseId.HasValue && _houseNames.TryGetValue(houseId.Value, out var name) ? name : "—";
+
+    private async Task OpenEditDialog(MiscellaneousEntry entry)
+    {
+        var parameters = new DialogParameters<EditMiscEntryDialog>
+        {
+            { x => x.Entry, entry },
+            { x => x.Workers, _workers },
+            { x => x.Houses, _houses }
+        };
+
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<EditMiscEntryDialog>("Edit Miscellaneous Entry", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is not null && !result.Canceled)
+        {
+            await LoadMiscEntries();
+            Snackbar.Add("Miscellaneous entry updated", Severity.Success);
+        }
+    }
+
+    private async Task ConfirmDelete(MiscellaneousEntry entry)
+    {
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { x => x.ContentText, "Are you sure you want to delete this miscellaneous entry?" },
+            { x => x.ButtonText, "Delete" },
+            { x => x.Color, Color.Error }
+        };
+
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Delete Miscellaneous Entry", parameters);
+        var result = await dialog.Result;
+
+        if (result is not null && !result.Canceled)
+        {
+            await MiscEntryService.DeleteAsync(entry.Id);
+            await LoadMiscEntries();
+            Snackbar.Add("Miscellaneous entry deleted", Severity.Success);
+        }
+    }
+}

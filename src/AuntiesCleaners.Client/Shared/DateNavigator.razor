@@ -1,0 +1,39 @@
+@using AuntiesCleaners.Client.Models
+
+<MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+    <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft"
+                   OnClick="GoBack"
+                   aria-label="Previous day" />
+
+    <MudDatePicker Date="Date" DateChanged="OnDateChanged"
+                   Variant="Variant.Outlined"
+                   Margin="Margin.Dense"
+                   DateFormat="ddd, MMM d, yyyy" />
+
+    <MudIconButton Icon="@Icons.Material.Filled.ChevronRight"
+                   OnClick="GoForward"
+                   aria-label="Next day" />
+</MudStack>
+
+@code {
+    [Parameter] public DateTime? Date { get; set; } = DateTime.Today;
+    [Parameter] public EventCallback<DateTime?> DateChanged { get; set; }
+
+    private async Task OnDateChanged(DateTime? newDate)
+    {
+        Date = newDate;
+        await DateChanged.InvokeAsync(Date);
+    }
+
+    private async Task GoBack()
+    {
+        Date = (Date ?? DateTime.Today).AddDays(-1);
+        await DateChanged.InvokeAsync(Date);
+    }
+
+    private async Task GoForward()
+    {
+        Date = (Date ?? DateTime.Today).AddDays(1);
+        await DateChanged.InvokeAsync(Date);
+    }
+}

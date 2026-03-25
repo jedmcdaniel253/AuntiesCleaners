@@ -1,0 +1,165 @@
+@page "/worker-pay"
+@using AuntiesCleaners.Client.Models
+@using AuntiesCleaners.Client.Services
+@using AuntiesCleaners.Client.Shared
+@inject IWorkerPayService WorkerPayService
+@inject ISnackbar Snackbar
+
+<RoleGuard AllowedRoles="@(new[] { Role.Boss, Role.Admin })">
+    <MudText Typo="Typo.h5" Class="mb-4">Worker Pay</MudText>
+
+    <MudPaper Class="pa-4 mb-4" Elevation="1">
+        <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+            <MudDatePicker Label="From Date" @bind-Date="_fromDate" Variant="Variant.Outlined" Style="max-width:200px" />
+            <MudDatePicker Label="To Date" @bind-Date="_toDate" Variant="Variant.Outlined" Style="max-width:200px" />
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="GenerateReport" Disabled="_loading">
+                @if (_loading) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+                Generate
+            </MudButton>
+        </MudStack>
+    </MudPaper>
+
+    @if (_report != null)
+    {
+        @if (_report.WorkerPayments.Count == 0)
+        {
+            <MudAlert Severity="Severity.Info" Class="mb-4">No entries found for the selected period.</MudAlert>
+        }
+        else
+        {
+            @foreach (var worker in _report.WorkerPayments)
+            {
+                <MudPaper Class="pa-4 mb-3" Elevation="1">
+                    <MudText Typo="Typo.h6" Class="mb-2">@worker.WorkerName</MudText>
+
+                    @if (worker.CleaningItems.Count > 0)
+                    {
+                        <MudText Typo="Typo.subtitle2" Class="mt-2 mb-1">Cleaning</MudText>
+                        <MudTable Items="@worker.CleaningItems" Hover="true" Dense="true">
+                            <HeaderContent>
+                                <MudTh>Description</MudTh>
+                                <MudTh Style="text-align:right">Amount</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd>@context.Description</MudTd>
+                                <MudTd Style="text-align:right">@context.Amount.ToString("C2")</MudTd>
+                            </RowTemplate>
+                        </MudTable>
+                        <MudText Typo="Typo.body2" Class="mt-1" Style="text-align:right">Cleaning Total: @worker.CleaningPay.ToString("C2")</MudText>
+                    }
+
+                    @if (worker.LaundryItems.Count > 0)
+                    {
+                        <MudText Typo="Typo.subtitle2" Class="mt-2 mb-1">Laundry</MudText>
+                        <MudTable Items="@worker.LaundryItems" Hover="true" Dense="true">
+                            <HeaderContent>
+                                <MudTh>Description</MudTh>
+                                <MudTh Style="text-align:right">Amount</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd>@context.Description</MudTd>
+                                <MudTd Style="text-align:right">@context.Amount.ToString("C2")</MudTd>
+                            </RowTemplate>
+                        </MudTable>
+                        <MudText Typo="Typo.body2" Class="mt-1" Style="text-align:right">Laundry Total: @worker.LaundryPay.ToString("C2")</MudText>
+                    }
+
+                    @if (worker.MaintenanceItems.Count > 0)
+                    {
+                        <MudText Typo="Typo.subtitle2" Class="mt-2 mb-1">Maintenance</MudText>
+                        <MudTable Items="@worker.MaintenanceItems" Hover="true" Dense="true">
+                            <HeaderContent>
+                                <MudTh>Description</MudTh>
+                                <MudTh Style="text-align:right">Amount</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd>@context.Description</MudTd>
+                                <MudTd Style="text-align:right">@context.Amount.ToString("C2")</MudTd>
+                            </RowTemplate>
+                        </MudTable>
+                        <MudText Typo="Typo.body2" Class="mt-1" Style="text-align:right">Maintenance Total: @worker.MaintenancePay.ToString("C2")</MudText>
+                    }
+
+                    @if (worker.LawnItems.Count > 0)
+                    {
+                        <MudText Typo="Typo.subtitle2" Class="mt-2 mb-1">Lawn</MudText>
+                        <MudTable Items="@worker.LawnItems" Hover="true" Dense="true">
+                            <HeaderContent>
+                                <MudTh>Description</MudTh>
+                                <MudTh Style="text-align:right">Amount</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd>@context.Description</MudTd>
+                                <MudTd Style="text-align:right">@context.Amount.ToString("C2")</MudTd>
+                            </RowTemplate>
+                        </MudTable>
+                        <MudText Typo="Typo.body2" Class="mt-1" Style="text-align:right">Lawn Total: @worker.LawnPay.ToString("C2")</MudText>
+                    }
+
+                    @if (worker.MiscItems.Count > 0)
+                    {
+                        <MudText Typo="Typo.subtitle2" Class="mt-2 mb-1">Miscellaneous</MudText>
+                        <MudTable Items="@worker.MiscItems" Hover="true" Dense="true">
+                            <HeaderContent>
+                                <MudTh>Description</MudTh>
+                                <MudTh Style="text-align:right">Amount</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd>@context.Description</MudTd>
+                                <MudTd Style="text-align:right">@context.Amount.ToString("C2")</MudTd>
+                            </RowTemplate>
+                        </MudTable>
+                        <MudText Typo="Typo.body2" Class="mt-1" Style="text-align:right">Misc Total: @worker.MiscPay.ToString("C2")</MudText>
+                    }
+
+                    <MudDivider Class="my-2" />
+                    <MudStack Row="true" Justify="Justify.FlexEnd">
+                        <MudText Typo="Typo.subtitle1"><strong>Worker Total: @worker.Total.ToString("C2")</strong></MudText>
+                    </MudStack>
+                </MudPaper>
+            }
+
+            <MudPaper Class="pa-4 mb-3" Elevation="2">
+                <MudStack Row="true" Justify="Justify.FlexEnd">
+                    <MudText Typo="Typo.h5"><strong>Grand Total: @_report.GrandTotal.ToString("C2")</strong></MudText>
+                </MudStack>
+            </MudPaper>
+        }
+    }
+</RoleGuard>
+
+@code {
+    private DateTime? _fromDate = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+    private DateTime? _toDate = DateTime.Today;
+    private WorkerPayReport? _report;
+    private bool _loading;
+
+    private async Task GenerateReport()
+    {
+        if (_fromDate == null || _toDate == null)
+        {
+            Snackbar.Add("Please select both From and To dates.", Severity.Warning);
+            return;
+        }
+
+        if (_fromDate > _toDate)
+        {
+            Snackbar.Add("From date must be before To date.", Severity.Warning);
+            return;
+        }
+
+        _loading = true;
+        try
+        {
+            _report = await WorkerPayService.GeneratePayReportAsync(_fromDate.Value, _toDate.Value);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error generating report: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

@@ -1,0 +1,40 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  build-test-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Restore
+        run: dotnet restore AuntiesCleaners.sln
+
+      - name: Build
+        run: dotnet build AuntiesCleaners.sln -c Release --no-restore
+
+      - name: Test
+        run: dotnet test AuntiesCleaners.sln -c Release --no-build --verbosity normal
+
+      - name: Publish
+        run: dotnet publish src/AuntiesCleaners.Client/AuntiesCleaners.Client.csproj -c Release -o release --no-build
+
+      - name: Copy index.html to 404.html
+        run: cp release/wwwroot/index.html release/wwwroot/404.html
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        if: github.ref == 'refs/heads/main'
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: release/wwwroot

@@ -1,0 +1,125 @@
+@page "/workers"
+@using AuntiesCleaners.Client.Models
+@using AuntiesCleaners.Client.Services
+@using AuntiesCleaners.Client.Shared
+@inject IWorkerService WorkerService
+@inject ISnackbar Snackbar
+
+<RoleGuard AllowedRoles="@(new[] { Role.Boss, Role.Admin })">
+    <MudText Typo="Typo.h5" Class="mb-4">Workers</MudText>
+
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mb-4" OnClick="ShowAddForm">
+        Add Worker
+    </MudButton>
+
+    @if (_showForm)
+    {
+        <MudPaper Class="pa-4 mb-4" Elevation="2">
+            <MudText Typo="Typo.h6" Class="mb-2">@(_editingWorker?.Id != Guid.Empty ? "Edit" : "Add") Worker</MudText>
+            <MudTextField @bind-Value="_formName" Label="Name" Variant="Variant.Outlined" Class="mb-2" />
+            <MudTextField @bind-Value="_formPhone" Label="Phone (optional)" Variant="Variant.Outlined" Class="mb-2" />
+            <MudStack Row="true" Spacing="2">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveWorker">Save</MudButton>
+                <MudButton Variant="Variant.Text" OnClick="CancelForm">Cancel</MudButton>
+            </MudStack>
+        </MudPaper>
+    }
+
+    <MudTable Items="_workers" Hover="true" Dense="true">
+        <HeaderContent>
+            <MudTh>Name</MudTh>
+            <MudTh>Phone</MudTh>
+            <MudTh>Status</MudTh>
+            <MudTh>Actions</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd>@context.Name</MudTd>
+            <MudTd>
+                @if (!string.IsNullOrEmpty(context.Phone))
+                {
+                    <MudLink Href="@($"sms:{context.Phone}")" Target="_blank">@context.Phone</MudLink>
+                }
+            </MudTd>
+            <MudTd>
+                <MudChip T="string" Color="@(context.IsActive ? Color.Success : Color.Default)" Size="Size.Small">
+                    @(context.IsActive ? "Active" : "Inactive")
+                </MudChip>
+            </MudTd>
+            <MudTd>
+                <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" OnClick="@(() => EditWorker(context))" />
+                @if (context.IsActive)
+                {
+                    <MudIconButton Icon="@Icons.Material.Filled.PersonOff" Size="Size.Small" Color="Color.Error"
+                                   OnClick="@(() => DeactivateWorker(context))" />
+                }
+            </MudTd>
+        </RowTemplate>
+    </MudTable>
+</RoleGuard>
+
+@code {
+    private List<Worker> _workers = new();
+    private bool _showForm;
+    private Worker? _editingWorker;
+    private string _formName = string.Empty;
+    private string _formPhone = string.Empty;
+
+    protected override async Task OnInitializedAsync() => await LoadWorkers();
+
+    private async Task LoadWorkers()
+    {
+        _workers = await WorkerService.GetAllAsync();
+    }
+
+    private void ShowAddForm()
+    {
+        _editingWorker = new Worker();
+        _formName = string.Empty;
+        _formPhone = string.Empty;
+        _showForm = true;
+    }
+
+    private void EditWorker(Worker worker)
+    {
+        _editingWorker = worker;
+        _formName = worker.Name;
+        _formPhone = worker.Phone ?? string.Empty;
+        _showForm = true;
+    }
+
+    private void CancelForm() => _showForm = false;
+
+    private async Task SaveWorker()
+    {
+        if (string.IsNullOrWhiteSpace(_formName))
+        {
+            Snackbar.Add("Name is required.", Severity.Error);
+            return;
+        }
+
+        if (_editingWorker!.Id == Guid.Empty)
+        {
+            _editingWorker.Name = _formName;
+            _editingWorker.Phone = string.IsNullOrWhiteSpace(_formPhone) ? null : _formPhone;
+            await WorkerService.CreateAsync(_editingWorker);
+            Snackbar.Add("Worker added.", Severity.Success);
+        }
+        else
+        {
+            _editingWorker.Name = _formName;
+            _editingWorker.Phone = string.IsNullOrWhiteSpace(_formPhone) ? null : _formPhone;
+            await WorkerService.UpdateAsync(_editingWorker);
+            Snackbar.Add("Worker updated.", Severity.Success);
+        }
+
+        _showForm = false;
+        await LoadWorkers();
+    }
+
+    private async Task DeactivateWorker(Worker worker)
+    {
+        await WorkerService.DeactivateAsync(worker.Id);
+        Snackbar.Add($"{worker.Name} deactivated.", Severity.Info);
+        await LoadWorkers();
+    }
+}

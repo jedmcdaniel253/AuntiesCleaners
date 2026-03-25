@@ -1,0 +1,135 @@
+@page "/owner-contact"
+@using AuntiesCleaners.Client.Models
+@using AuntiesCleaners.Client.Services
+@using AuntiesCleaners.Client.Shared
+@using System.ComponentModel.DataAnnotations
+@inject IOwnerService OwnerService
+@inject ISnackbar Snackbar
+
+<RoleGuard AllowedRoles="@(new[] { Role.Boss, Role.Admin })">
+    <MudText Typo="Typo.h5" Class="mb-4">Owner Contact</MudText>
+
+    @if (_loading)
+    {
+        <MudProgressCircular Indeterminate="true" />
+    }
+    else if (_owner == null)
+    {
+        <MudAlert Severity="Severity.Warning">No owner record found.</MudAlert>
+    }
+    else if (!_editing)
+    {
+        <MudCard Class="mb-4">
+            <MudCardContent>
+                <MudText Typo="Typo.h6" Class="mb-2">@_owner.Name</MudText>
+                <MudStack Spacing="1">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                        <MudIcon Icon="@Icons.Material.Filled.Email" Size="Size.Small" />
+                        <MudLink Href="@($"mailto:{_owner.Email}")">@_owner.Email</MudLink>
+                    </MudStack>
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                        <MudIcon Icon="@Icons.Material.Filled.Phone" Size="Size.Small" />
+                        <MudLink Href="@($"sms:{_owner.Phone}")">@_owner.Phone</MudLink>
+                    </MudStack>
+                </MudStack>
+            </MudCardContent>
+            <MudCardActions>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="StartEditing">Edit</MudButton>
+            </MudCardActions>
+        </MudCard>
+    }
+    else
+    {
+        <MudPaper Class="pa-4 mb-4" Elevation="2">
+            <MudText Typo="Typo.h6" Class="mb-2">Edit Owner Contact</MudText>
+            <MudTextField @bind-Value="_formName" Label="Name" Required="true" RequiredError="Name is required."
+                          Variant="Variant.Outlined" Class="mb-2" />
+            <MudTextField @bind-Value="_formEmail" Label="Email" Required="true" RequiredError="Email is required."
+                          InputType="InputType.Email" Variant="Variant.Outlined" Class="mb-2" />
+            <MudTextField @bind-Value="_formPhone" Label="Phone" Required="true" RequiredError="Phone is required."
+                          InputType="InputType.Telephone" Variant="Variant.Outlined" Class="mb-2" />
+            <MudStack Row="true" Spacing="2">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveOwner">Save</MudButton>
+                <MudButton Variant="Variant.Text" OnClick="CancelEditing">Cancel</MudButton>
+            </MudStack>
+        </MudPaper>
+    }
+</RoleGuard>
+
+@code {
+    private Owner? _owner;
+    private bool _loading = true;
+    private bool _editing;
+
+    private string _formName = string.Empty;
+    private string _formEmail = string.Empty;
+    private string _formPhone = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadOwner();
+    }
+
+    private async Task LoadOwner()
+    {
+        _loading = true;
+        _owner = await OwnerService.GetOwnerAsync();
+        _loading = false;
+    }
+
+    private void StartEditing()
+    {
+        if (_owner == null) return;
+        _formName = _owner.Name;
+        _formEmail = _owner.Email;
+        _formPhone = _owner.Phone;
+        _editing = true;
+    }
+
+    private void CancelEditing()
+    {
+        _editing = false;
+    }
+
+    private async Task SaveOwner()
+    {
+        if (string.IsNullOrWhiteSpace(_formName))
+        {
+            Snackbar.Add("Name is required.", Severity.Error);
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_formEmail))
+        {
+            Snackbar.Add("Email is required.", Severity.Error);
+            return;
+        }
+
+        if (!new EmailAddressAttribute().IsValid(_formEmail))
+        {
+            Snackbar.Add("Please enter a valid email address.", Severity.Error);
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_formPhone))
+        {
+            Snackbar.Add("Phone is required.", Severity.Error);
+            return;
+        }
+
+        _owner!.Name = _formName.Trim();
+        _owner.Email = _formEmail.Trim();
+        _owner.Phone = _formPhone.Trim();
+
+        try
+        {
+            _owner = await OwnerService.UpdateAsync(_owner);
+            Snackbar.Add("Owner contact updated.", Severity.Success);
+            _editing = false;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error saving: {ex.Message}", Severity.Error);
+        }
+    }
+}

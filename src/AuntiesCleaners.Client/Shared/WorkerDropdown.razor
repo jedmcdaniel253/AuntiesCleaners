@@ -1,0 +1,53 @@
+@using AuntiesCleaners.Client.Models
+@using AuntiesCleaners.Client.Services
+@inject IWorkerService WorkerService
+@inject IAuthService AuthService
+
+<MudSelect T="Guid" Label="Worker" Value="Value" Variant="Variant.Outlined"
+           ValueChanged="OnValueChanged" Required="true" RequiredError="Worker is required"
+           ToStringFunc="@(id => GetWorkerName(id))">
+    @foreach (var worker in _workers)
+    {
+        <MudSelectItem T="Guid" Value="@worker.Id">@worker.Name</MudSelectItem>
+    }
+</MudSelect>
+
+@code {
+    [Parameter] public Guid Value { get; set; }
+    [Parameter] public EventCallback<Guid> ValueChanged { get; set; }
+
+    private List<Worker> _workers = new();
+
+    private string GetWorkerName(Guid id)
+    {
+        if (id == Guid.Empty) return string.Empty;
+        var worker = _workers.FirstOrDefault(w => w.Id == id);
+        return worker?.Name ?? id.ToString();
+    }
+
+    private async Task OnValueChanged(Guid newValue)
+    {
+        Value = newValue;
+        await ValueChanged.InvokeAsync(Value);
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        _workers = await WorkerService.GetActiveAsync();
+
+        if (Value == Guid.Empty)
+        {
+            var workerId = await AuthService.GetCurrentWorkerIdAsync();
+            if (workerId.HasValue && _workers.Any(w => w.Id == workerId.Value))
+            {
+                Value = workerId.Value;
+                await ValueChanged.InvokeAsync(Value);
+            }
+            else if (_workers.Any())
+            {
+                Value = _workers.First().Id;
+                await ValueChanged.InvokeAsync(Value);
+            }
+        }
+    }
+}

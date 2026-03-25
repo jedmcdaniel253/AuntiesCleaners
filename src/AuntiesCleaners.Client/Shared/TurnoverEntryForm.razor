@@ -1,0 +1,44 @@
+@using AuntiesCleaners.Client.Models
+@using AuntiesCleaners.Client.Services
+
+<MudForm @ref="_form">
+    <HouseDropdown Value="@Event.HouseId" ValueChanged="@(v => Event.HouseId = v)" IncludeMultipleHouses="false" />
+
+    <MudDatePicker Label="Date" Date="@Event.EventDate" DateChanged="@(v => Event.EventDate = v ?? DateTime.Today)"
+                   Variant="Variant.Outlined" Required="true" RequiredError="Date is required" Class="mt-3" />
+
+    <MudCheckBox T="bool" Label="Checkout" @bind-Value="Event.IsCheckout" Class="mt-2" />
+    <MudCheckBox T="bool" Label="Checkin" @bind-Value="Event.IsCheckin" Class="mt-1" />
+
+    <MudTextField T="string" Label="Notes" @bind-Value="Event.Notes"
+                  Variant="Variant.Outlined" Lines="2" Class="mt-3" />
+
+    <MudStack Row="true" Spacing="2" Class="mt-3">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Submit">Save</MudButton>
+        <MudButton Variant="Variant.Text" OnClick="Cancel">Cancel</MudButton>
+    </MudStack>
+</MudForm>
+
+@code {
+    [Parameter] public TurnoverEvent Event { get; set; } = new();
+    [Parameter] public EventCallback OnSubmitted { get; set; }
+    [Parameter] public EventCallback OnCancelled { get; set; }
+
+    private MudForm _form = null!;
+
+    private async Task Submit()
+    {
+        await _form.ValidateAsync();
+        if (!_form.IsValid) return;
+
+        if (Event.HouseId == Guid.Empty)
+            return;
+
+        await OnSubmitted.InvokeAsync();
+    }
+
+    private async Task Cancel()
+    {
+        await OnCancelled.InvokeAsync();
+    }
+}

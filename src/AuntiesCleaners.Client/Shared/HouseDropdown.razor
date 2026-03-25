@@ -1,0 +1,45 @@
+@using AuntiesCleaners.Client.Models
+@using AuntiesCleaners.Client.Services
+@inject IHouseService HouseService
+
+<MudSelect T="Guid" Label="House" Value="Value" Variant="Variant.Outlined"
+           ValueChanged="OnValueChanged" Required="true" RequiredError="House is required">
+    @foreach (var house in _houses)
+    {
+        <MudSelectItem T="Guid" Value="@house.Id">@house.Name</MudSelectItem>
+    }
+</MudSelect>
+
+@code {
+    [Parameter] public Guid Value { get; set; }
+    [Parameter] public EventCallback<Guid> ValueChanged { get; set; }
+    [Parameter] public bool IncludeMultipleHouses { get; set; } = true;
+
+    private List<House> _houses = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (IncludeMultipleHouses)
+        {
+            var houses = await HouseService.GetActiveAsync();
+            // Ensure Multiple Houses appears first
+            _houses = houses.OrderByDescending(h => h.IsMultipleHouses).ThenBy(h => h.Name).ToList();
+        }
+        else
+        {
+            _houses = await HouseService.GetActiveExcludingMultipleAsync();
+        }
+
+        if (Value == Guid.Empty && _houses.Any())
+        {
+            Value = _houses.First().Id;
+            await ValueChanged.InvokeAsync(Value);
+        }
+    }
+
+    private async Task OnValueChanged(Guid newValue)
+    {
+        Value = newValue;
+        await ValueChanged.InvokeAsync(Value);
+    }
+}

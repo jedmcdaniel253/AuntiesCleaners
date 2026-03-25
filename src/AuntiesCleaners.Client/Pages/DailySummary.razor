@@ -1,0 +1,247 @@
+@page "/daily-summary"
+@using AuntiesCleaners.Client.Models
+@using AuntiesCleaners.Client.Services
+@using AuntiesCleaners.Client.Shared
+@inject IWorkEntryService WorkEntryService
+@inject IMiscEntryService MiscEntryService
+@inject IWorkerService WorkerService
+@inject IHouseService HouseService
+@inject IAuthService AuthService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<RoleGuard AllowedRoles="@(new[] { Role.Manager, Role.Boss, Role.Admin })">
+
+<MudText Typo="Typo.h5" Class="mb-4">Daily Summary</MudText>
+
+<DateNavigator Date="_selectedDate" DateChanged="OnDateChanged" />
+
+<MudStack Row="true" AlignItems="AlignItems.Center" Class="my-4" Spacing="3">
+    <MudSelect T="Guid?" Label="Worker" Value="_selectedWorkerId" ValueChanged="OnWorkerFilterChanged"
+               Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 300px;">
+        <MudSelectItem T="Guid?" Value="@((Guid?)null)">All Workers</MudSelectItem>
+        @foreach (var worker in _workers)
+        {
+            <MudSelectItem T="Guid?" Value="@((Guid?)worker.Id)">@worker.Name</MudSelectItem>
+        }
+    </MudSelect>
+
+    <MudSelect T="WorkCategory?" Label="Add Entry" Value="_addCategory" ValueChanged="OnAddCategorySelected"
+               Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 200px;"
+               Placeholder="Select category...">
+        <MudSelectItem T="WorkCategory?" Value="@((WorkCategory?)WorkCategory.Cleaning)">Cleaning</MudSelectItem>
+        <MudSelectItem T="WorkCategory?" Value="@((WorkCategory?)WorkCategory.Laundry)">Laundry</MudSelectItem>
+        <MudSelectItem T="WorkCategory?" Value="@((WorkCategory?)WorkCategory.Maintenance)">Maintenance</MudSelectItem>
+        <MudSelectItem T="WorkCategory?" Value="@((WorkCategory?)WorkCategory.Lawn)">Lawn</MudSelectItem>
+    </MudSelect>
+</MudStack>
+
+<MudDivider Class="my-4" />
+
+@if (_loading)
+{
+    <MudProgressCircular Indeterminate="true" Class="d-flex mx-auto my-8" />
+}
+else if (!_entries.Any() && !_miscEntries.Any())
+{
+    <MudAlert Severity="Severity.Info" Class="mt-4">No entries found for this date.</MudAlert>
+}
+else
+{
+    @if (_entries.Any())
+    {
+    <MudTable Items="_entries" Hover="true" Dense="true" Striped="true" Class="mt-4">
+        <HeaderContent>
+            <MudTh>Worker</MudTh>
+            <MudTh>House</MudTh>
+            <MudTh>Category</MudTh>
+            <MudTh>Hours/Loads</MudTh>
+            <MudTh>Actions</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Worker">@GetWorkerName(context.WorkerId)</MudTd>
+            <MudTd DataLabel="House">@GetHouseName(context.HouseId)</MudTd>
+            <MudTd DataLabel="Category">@context.WorkCategoryValue</MudTd>
+            <MudTd DataLabel="Hours/Loads">@GetHoursLoadsDisplay(context)</MudTd>
+            <MudTd>
+                <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
+                               OnClick="@(() => OpenEditDialog(context))" aria-label="Edit entry" />
+                <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
+                               Color="Color.Error"
+                               OnClick="@(() => ConfirmDelete(context))" aria-label="Delete entry" />
+            </MudTd>
+        </RowTemplate>
+    </MudTable>
+    }
+
+    @if (_miscEntries.Any())
+    {
+    <MudText Typo="Typo.h6" Class="mt-6 mb-2">Miscellaneous Entries</MudText>
+    <MudTable Items="_miscEntries" Hover="true" Dense="true" Striped="true">
+        <HeaderContent>
+            <MudTh>Worker</MudTh>
+            <MudTh>House</MudTh>
+            <MudTh>Description</MudTh>
+            <MudTh>Charge</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Worker">@GetWorkerName(context.WorkerId)</MudTd>
+            <MudTd DataLabel="House">@(context.HouseId.HasValue ? GetHouseName(context.HouseId.Value) : "-")</MudTd>
+            <MudTd DataLabel="Description">@context.Description</MudTd>
+            <MudTd DataLabel="Charge">@context.ChargeAmount.ToString("C")</MudTd>
+        </RowTemplate>
+    </MudTable>
+    }
+}
+
+</RoleGuard>
+
+@code {
+    private DateTime? _selectedDate = DateTime.Today;
+    private Guid? _selectedWorkerId;
+    private WorkCategory? _addCategory;
+    private List<WorkEntry> _entries = new();
+    private List<MiscellaneousEntry> _miscEntries = new();
+    private List<Worker> _workers = new();
+    private List<House> _houses = new();
+    private Dictionary<Guid, string> _workerNames = new();
+    private Dictionary<Guid, string> _houseNames = new();
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _workers = await WorkerService.GetActiveAsync();
+        _houses = await HouseService.GetActiveAsync();
+
+        _workerNames = _workers.ToDictionary(w => w.Id, w => w.Name);
+        _houseNames = _houses.ToDictionary(h => h.Id, h => h.Name);
+
+        await LoadEntries();
+    }
+
+    private async Task OnDateChanged(DateTime? newDate)
+    {
+        _selectedDate = newDate;
+        await LoadEntries();
+    }
+
+    private async Task OnWorkerFilterChanged(Guid? workerId)
+    {
+        _selectedWorkerId = workerId;
+        await LoadEntries();
+    }
+
+    private async Task OnAddCategorySelected(WorkCategory? category)
+    {
+        _addCategory = null;
+        if (category.HasValue)
+        {
+            await OpenAddEntryDialog(category.Value);
+        }
+    }
+
+    private async Task LoadEntries()
+    {
+        _loading = true;
+        StateHasChanged();
+
+        var date = _selectedDate ?? DateTime.Today;
+
+        if (_selectedWorkerId.HasValue)
+        {
+            _entries = await WorkEntryService.GetByDateAndWorkerAsync(date, _selectedWorkerId.Value);
+            _miscEntries = (await MiscEntryService.GetByDateAsync(date))
+                .Where(m => m.WorkerId == _selectedWorkerId.Value).ToList();
+        }
+        else
+        {
+            _entries = await WorkEntryService.GetByDateAsync(date);
+            _miscEntries = await MiscEntryService.GetByDateAsync(date);
+        }
+
+        _loading = false;
+        StateHasChanged();
+    }
+
+    private string GetWorkerName(Guid workerId) =>
+        _workerNames.TryGetValue(workerId, out var name) ? name : "Unknown";
+
+    private string GetHouseName(Guid houseId) =>
+        _houseNames.TryGetValue(houseId, out var name) ? name : "Unknown";
+
+    private string GetHoursLoadsDisplay(WorkEntry entry)
+    {
+        if (entry.WorkCategoryValue == WorkCategory.Cleaning.ToString() ||
+            entry.WorkCategoryValue == WorkCategory.Maintenance.ToString())
+        {
+            return entry.HoursBilled?.ToString("0.##") + " hrs" ?? "-";
+        }
+        if (entry.WorkCategoryValue == WorkCategory.Laundry.ToString())
+        {
+            return entry.NumberOfLoads?.ToString() + " loads" ?? "-";
+        }
+        return "-";
+    }
+
+    private async Task OpenEditDialog(WorkEntry entry)
+    {
+        var category = Enum.TryParse<WorkCategory>(entry.WorkCategoryValue, out var cat) ? cat : WorkCategory.Cleaning;
+
+        var parameters = new DialogParameters<EditWorkEntryDialog>
+        {
+            { x => x.Entry, entry },
+            { x => x.Category, category },
+            { x => x.Workers, _workers },
+            { x => x.Houses, _houses }
+        };
+
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<EditWorkEntryDialog>("Edit Entry", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is not null && !result.Canceled)
+        {
+            await LoadEntries();
+            Snackbar.Add("Entry updated", Severity.Success);
+        }
+    }
+
+    private async Task ConfirmDelete(WorkEntry entry)
+    {
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { x => x.ContentText, "Are you sure you want to delete this entry?" },
+            { x => x.ButtonText, "Delete" },
+            { x => x.Color, Color.Error }
+        };
+
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Delete Entry", parameters);
+        var result = await dialog.Result;
+
+        if (result is not null && !result.Canceled)
+        {
+            await WorkEntryService.DeleteAsync(entry.Id);
+            await LoadEntries();
+            Snackbar.Add("Entry deleted", Severity.Success);
+        }
+    }
+
+    private async Task OpenAddEntryDialog(WorkCategory category)
+    {
+        var parameters = new DialogParameters<AddWorkEntryDialog>
+        {
+            { x => x.Category, category },
+            { x => x.InitialDate, _selectedDate ?? DateTime.Today }
+        };
+
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<AddWorkEntryDialog>("Add Entry", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is not null && !result.Canceled)
+        {
+            await LoadEntries();
+            Snackbar.Add("Entry added", Severity.Success);
+        }
+    }
+}

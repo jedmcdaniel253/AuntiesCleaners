@@ -1,0 +1,19 @@
+@using AuntiesCleaners.Client.Models
+
+<MudDialog>
+    <DialogContent>
+        <WorkEntryForm Category="Category" OnSubmitted="OnEntrySubmitted" />
+    </DialogContent>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter] public WorkCategory Category { get; set; }
+    [Parameter] public DateTime InitialDate { get; set; } = DateTime.Today;
+
+    private void OnEntrySubmitted()
+    {
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+}

@@ -1,0 +1,144 @@
+@page "/tab-config"
+@using AuntiesCleaners.Client.Models
+@using AuntiesCleaners.Client.Services
+@using AuntiesCleaners.Client.Shared
+@inject ITabConfigService TabConfigService
+@inject IUserService UserService
+@inject ISnackbar Snackbar
+@inject TabConfigNotifier Notifier
+
+<RoleGuard AllowedRoles="@(new[] { Role.Boss, Role.Admin })">
+    <MudText Typo="Typo.h5" Class="mb-4">Tab Configuration</MudText>
+
+    <MudSelect T="Guid?" Label="Select User" Value="_selectedUserId" Variant="Variant.Outlined" Class="mb-4"
+               ValueChanged="OnUserSelected">
+        @foreach (var user in _users)
+        {
+            <MudSelectItem T="Guid?" Value="@user.Id">@user.Name (@user.RoleValue)</MudSelectItem>
+        }
+    </MudSelect>
+
+    @if (_selectedUserId.HasValue && _tabItems.Any())
+    {
+        <MudText Typo="Typo.subtitle1" Class="mb-2">Drag to reorder. Toggle visibility for bottom nav.</MudText>
+        <MudList T="TabConfigItem">
+            @foreach (var item in _tabItems.OrderBy(t => t.Order))
+            {
+                <MudListItem>
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                        <MudIconButton Icon="@Icons.Material.Filled.ArrowUpward" Size="Size.Small"
+                                       Disabled="@(item.Order == 0)"
+                                       OnClick="@(() => MoveUp(item))" />
+                        <MudIconButton Icon="@Icons.Material.Filled.ArrowDownward" Size="Size.Small"
+                                       Disabled="@(item.Order == _tabItems.Count - 1)"
+                                       OnClick="@(() => MoveDown(item))" />
+                        <MudSwitch T="bool" @bind-Value="item.IsVisible" Color="Color.Primary" />
+                        <MudText>@item.TabName</MudText>
+                    </MudStack>
+                </MudListItem>
+            }
+        </MudList>
+
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mt-4" OnClick="SaveConfig">
+            Save Configuration
+        </MudButton>
+    }
+</RoleGuard>
+
+@code {
+    private List<UserProfile> _users = new();
+    private Guid? _selectedUserId;
+    private List<TabConfigItem> _tabItems = new();
+
+    private class TabConfigItem
+    {
+        public string TabName { get; set; } = string.Empty;
+        public int Order { get; set; }
+        public bool IsVisible { get; set; } = true;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var allUsers = await UserService.GetAllAsync();
+        _users = allUsers.Where(u => u.IsActive).ToList();
+    }
+
+    private async Task OnUserSelected(Guid? userId)
+    {
+        _selectedUserId = userId;
+        if (userId.HasValue)
+            await LoadConfig(userId.Value);
+        else
+            _tabItems.Clear();
+    }
+
+    private async Task LoadConfig(Guid userId)
+    {
+        var existing = await TabConfigService.GetTabsForUserAsync(userId);
+        var allTabNames = AllTabs.ByName.Keys.ToList();
+
+        if (existing.Any())
+        {
+            _tabItems = existing.Select(t => new TabConfigItem
+            {
+                TabName = t.TabName,
+                Order = t.DisplayOrder,
+                IsVisible = t.IsVisible
+            }).ToList();
+
+            var existingNames = _tabItems.Select(t => t.TabName).ToHashSet();
+            var maxOrder = _tabItems.Max(t => t.Order);
+            foreach (var name in allTabNames.Where(n => !existingNames.Contains(n)))
+            {
+                _tabItems.Add(new TabConfigItem { TabName = name, Order = ++maxOrder, IsVisible = false });
+            }
+        }
+        else
+        {
+            _tabItems = allTabNames.Select((name, i) => new TabConfigItem
+            {
+                TabName = name, Order = i, IsVisible = i < 5
+            }).ToList();
+        }
+    }
+
+    private void MoveUp(TabConfigItem item)
+    {
+        var sorted = _tabItems.OrderBy(t => t.Order).ToList();
+        var idx = sorted.IndexOf(item);
+        if (idx > 0)
+            (sorted[idx].Order, sorted[idx - 1].Order) = (sorted[idx - 1].Order, sorted[idx].Order);
+    }
+
+    private void MoveDown(TabConfigItem item)
+    {
+        var sorted = _tabItems.OrderBy(t => t.Order).ToList();
+        var idx = sorted.IndexOf(item);
+        if (idx < sorted.Count - 1)
+            (sorted[idx].Order, sorted[idx + 1].Order) = (sorted[idx + 1].Order, sorted[idx].Order);
+    }
+
+    private async Task SaveConfig()
+    {
+        if (!_selectedUserId.HasValue) return;
+
+        var tabs = _tabItems.Select(t => new TabConfiguration
+        {
+            TabName = t.TabName,
+            DisplayOrder = t.Order,
+            IsVisible = t.IsVisible
+        }).ToList();
+
+        try
+        {
+            await TabConfigService.SaveTabsForUserAsync(_selectedUserId.Value, tabs);
+            await Notifier.NotifyChanged();
+            Snackbar.Add("Tab configuration saved!", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[TabConfig] Save failed: {ex.Message}");
+            Snackbar.Add($"Failed to save: {ex.Message}", Severity.Error);
+        }
+    }
+}
