@@ -1,5 +1,5 @@
 self.assetsManifest = {
-  "version": "j/E7rtZV",
+  "version": "xaYiyiqx",
   "assets": [
     {
       "hash": "sha256-GOICr9yHA36MEPnZ8vharGMB011I3XMCR0K56HEw6WI=",
@@ -18,8 +18,8 @@ self.assetsManifest = {
       "url": "_content/MudBlazor/MudBlazor.min.js.map"
     },
     {
-      "hash": "sha256-FoesviDYxU9YzNI701KRRwf+X47d3PnwZsOSDEGuvrY=",
-      "url": "_framework/AuntiesCleaners.Client.ixit2o6yyh.wasm"
+      "hash": "sha256-7TDBKw5JIbUYYROJGX9RWfmNYzj3o6L+qhK8skF1/so=",
+      "url": "_framework/AuntiesCleaners.Client.lilgctgdv5.wasm"
     },
     {
       "hash": "sha256-XePOw4Z+OeufSwFCiMWnMVrbvM9QiA5GcdKbUBOv8xk=",
@@ -250,8 +250,8 @@ self.assetsManifest = {
       "url": "_framework/System.Memory.88jww524m9.wasm"
     },
     {
-      "hash": "sha256-GHa3DsfXXoKNBHk6otyh+HuZ95ymIkzjNyOqgbAwggQ=",
-      "url": "_framework/System.Net.Http.Json.wi0pjy8eee.wasm"
+      "hash": "sha256-7lur422QBGuNJp4PiljfZ0sZ28NxmAmdlxocTF8qiv0=",
+      "url": "_framework/System.Net.Http.Json.qqx9dp2han.wasm"
     },
     {
       "hash": "sha256-PYc+l8vN0VO4Y/Gaxnl4nP3Bdoayqw0oTvao8iq9lyU=",
@@ -394,7 +394,7 @@ self.assetsManifest = {
       "url": "_framework/Websocket.Client.sntjl98ana.wasm"
     },
     {
-      "hash": "sha256-gYBIIq6JLbZHTtjFb9KfCQ4evaT6vFzawL0iVWDt9Tk=",
+      "hash": "sha256-Zdqlh5TdybpB5c82b0fAwWoj8+79KsGXApCKc6AKy4U=",
       "url": "_framework/blazor.boot.json"
     },
     {
@@ -442,15 +442,15 @@ self.assetsManifest = {
       "url": "css/app.css"
     },
     {
-      "hash": "sha256-4mWsDy3aHl36ZbGt8zByK7Pvd4kRUoNgTYzRnwmPHwg=",
+      "hash": "sha256-3jWwIJ30vckPD1Gmj2xLwNbmC+tvlsKzgvIL4Y1gm1c=",
       "url": "favicon.png"
     },
     {
-      "hash": "sha256-DbpQaq68ZSb5IoPosBErM1QWBfsbTxpJqhU0REi6wP4=",
+      "hash": "sha256-yGPDknTNsUbg0FzIhufyFyFsmzPpxvD2b4OMxFWuvFk=",
       "url": "icon-192.png"
     },
     {
-      "hash": "sha256-oEo6d+KqX5fjxTiZk/w9NB3Mi0+ycS5yLwCKwr4IkbA=",
+      "hash": "sha256-4oYQTzqgVB76TNJyWou1pxkUIaZMXxL8Viq/gNeb6MI=",
       "url": "icon-512.png"
     },
     {
