@@ -4,6 +4,9 @@
 @using AuntiesCleaners.Client.Shared
 @inject IUserService UserService
 @inject IWorkerService WorkerService
+@inject IShareService ShareService
+@inject NavigationManager Navigation
+@inject IJSRuntime _jsRuntime
 @inject ISnackbar Snackbar
 
 <RoleGuard AllowedRoles="@(new[] { Role.Boss, Role.Admin })">
@@ -34,8 +37,18 @@
                 }
             </MudSelect>
             <MudStack Row="true" Spacing="2">
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CreateUser">Send Invite</MudButton>
-                <MudButton Variant="Variant.Text" OnClick="CancelCreate">Cancel</MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CreateUser" Disabled="_isInviting">
+                    @if (_isInviting)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                        <span>Sending...</span>
+                    }
+                    else
+                    {
+                        <span>Send Invite</span>
+                    }
+                </MudButton>
+                <MudButton Variant="Variant.Text" OnClick="CancelCreate" Disabled="_isInviting">Cancel</MudButton>
             </MudStack>
         </MudPaper>
     }
@@ -85,9 +98,12 @@
                 <MudTd>
                     <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
                                    OnClick="@(() => StartEditRole(context))" />
-                    <MudIconButton Icon="@Icons.Material.Filled.Email" Size="Size.Small" Color="Color.Primary"
+                    <MudIconButton Icon="@Icons.Material.Filled.Email" Size="Size.Small" Color="Color.Info"
                                    Title="Resend Invite"
                                    OnClick="@(() => ResendInvite(context))" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Share" Size="Size.Small" Color="Color.Primary"
+                                   Title="Share App Link"
+                                   OnClick="@(() => ShareAppLink())" />
                     @if (context.IsActive)
                     {
                         <MudIconButton Icon="@Icons.Material.Filled.PersonOff" Size="Size.Small" Color="Color.Error"
@@ -111,6 +127,7 @@
 
     // Create form state
     private bool _showCreateForm;
+    private bool _isInviting;
     private string _formName = string.Empty;
     private string _formEmail = string.Empty;
     private Role _formRole = Role.Worker;
@@ -160,25 +177,53 @@
             return;
         }
 
-        var userProfile = new UserProfile
-        {
-            Name = _formName.Trim(),
-            Email = _formEmail.Trim(),
-            RoleValue = _formRole.ToString(),
-            WorkerId = _formWorkerId,
-            IsActive = true
-        };
-
+        _isInviting = true;
         try
         {
-            await UserService.CreateAsync(userProfile, _formEmail.Trim());
-            Snackbar.Add("User created and invite sent.", Severity.Success);
-            _showCreateForm = false;
-            await LoadData();
+            var result = await UserService.InviteUserAsync(
+                _formName.Trim(),
+                _formEmail.Trim(),
+                _formRole.ToString(),
+                _formWorkerId);
+
+            if (result.Success)
+            {
+                if (!result.EmailSent)
+                {
+                    Snackbar.Add("User account created, but the invite email could not be sent.", Severity.Warning);
+                }
+                else
+                {
+                    Snackbar.Add("User created and invite sent.", Severity.Success);
+                }
+                _showCreateForm = false;
+                await LoadData();
+            }
+            else
+            {
+                Snackbar.Add(result.Error ?? "Failed to create user.", Severity.Error);
+            }
         }
         catch (Exception ex)
         {
             Snackbar.Add($"Error creating user: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isInviting = false;
+        }
+    }
+
+    private async Task ResendInvite(UserProfile user)
+    {
+        try
+        {
+            await UserService.ResendInviteAsync(user.Email);
+            Snackbar.Add($"Invite resent to {user.Email}.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error resending invite: {ex.Message}", Severity.Error);
         }
     }
 
@@ -244,16 +289,17 @@
         return worker?.Name ?? "Unknown";
     }
 
-    private async Task ResendInvite(UserProfile user)
+    private async Task ShareAppLink()
     {
-        try
+        var appUrl = Navigation.BaseUri;
+        if (await ShareService.CanShareAsync())
         {
-            await UserService.ResendInviteAsync(user.Email);
-            Snackbar.Add($"Invite resent to {user.Email}.", Severity.Success);
+            await ShareService.ShareTextAsync("Auntie's Cleaners", $"Join Auntie's Cleaners app: {appUrl}");
         }
-        catch (Exception ex)
+        else
         {
-            Snackbar.Add($"Error resending invite: {ex.Message}", Severity.Error);
+            await _jsRuntime.InvokeVoidAsync("navigator.clipboard.writeText", appUrl);
+            Snackbar.Add("App link copied to clipboard.", Severity.Success);
         }
     }
 }

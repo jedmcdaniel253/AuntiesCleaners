@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head><title>Icon Generator</title></head>
+<body style="font-family: sans-serif; padding: 20px;">
+  <h2>Auntie's Cleaners Icon Generator</h2>
+  <p>Select your vacuum PNG, then click "Download All" to save the icons.</p>
+  <input type="file" id="filePicker" accept="image/png,image/jpeg,image/svg+xml" />
+  <br><br>
+  <div style="display: flex; gap: 24px; align-items: end;">
+    <div>
+      <p>512x512</p>
+      <canvas id="c512" width="512" height="512" style="border:1px solid #ccc;"></canvas>
+    </div>
+    <div>
+      <p>192x192</p>
+      <canvas id="c192" width="192" height="192" style="border:1px solid #ccc;"></canvas>
+    </div>
+    <div>
+      <p>favicon 64x64</p>
+      <canvas id="c64" width="64" height="64" style="border:1px solid #ccc;"></canvas>
+    </div>
+  </div>
+  <br>
+  <button id="dlBtn" onclick="downloadAll()" disabled>Download All</button>
+
+  <script>
+    function roundRect(ctx, x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + w - r, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+      ctx.lineTo(x + w, y + h - r);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      ctx.lineTo(x + r, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.closePath();
+    }
+
+    function drawIcon(ctx, size, img) {
+      const s = size;
+      const r = s * 0.15;
+
+      // Purple rounded square background
+      roundRect(ctx, 0, 0, s, s, r);
+      ctx.fillStyle = '#7C3AED';
+      ctx.fill();
+
+      // Draw the vacuum PNG centered with padding
+      const padding = s * 0.15;
+      const available = s - padding * 2;
+      const aspect = img.naturalWidth / img.naturalHeight;
+      let drawW, drawH;
+      if (aspect > 1) {
+        drawW = available;
+        drawH = available / aspect;
+      } else {
+        drawH = available;
+        drawW = available * aspect;
+      }
+      const x = (s - drawW) / 2;
+      const y = (s - drawH) / 2;
+      ctx.drawImage(img, x, y, drawW, drawH);
+    }
+
+    function renderAll(img) {
+      [512, 192, 64].forEach(size => {
+        const canvas = document.getElementById('c' + size);
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, size, size);
+        drawIcon(ctx, size, img);
+      });
+      document.getElementById('dlBtn').disabled = false;
+    }
+
+    document.getElementById('filePicker').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(ev) {
+        const img = new Image();
+        img.onload = () => renderAll(img);
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+
+    function downloadAll() {
+      [512, 192, 64].forEach(size => {
+        const canvas = document.getElementById('c' + size);
+        const link = document.createElement('a');
+        const name = size === 64 ? 'favicon.png' : `icon-${size}.png`;
+        link.download = name;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+      });
+    }
+  </script>
+</body>
+</html>
