@@ -29,6 +29,12 @@ jobs:
       - name: Publish
         run: dotnet publish src/AuntiesCleaners.Client/AuntiesCleaners.Client.csproj -c Release -o release --no-build
 
+      - name: Set base href for GitHub Pages
+        run: |
+          sed -i 's|<base href="/" />|<base href="/AuntiesCleaners/" />|g' release/wwwroot/index.html
+          sed -i 's|const base = "/";|const base = "/AuntiesCleaners/";|g' release/wwwroot/service-worker-assets.js || true
+          sed -i 's|const base = "/";|const base = "/AuntiesCleaners/";|g' release/wwwroot/service-worker.js || true
+
       - name: Copy index.html to 404.html
         run: cp release/wwwroot/index.html release/wwwroot/404.html
 
