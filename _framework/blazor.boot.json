@@ -1,9 +1,9 @@
 {
   "mainAssemblyName": "AuntiesCleaners.Client",
   "resources": {
-    "hash": "sha256-LG5EEfHBvoHEKTX4LVxSjPOx66G/GYis1iwZymIRJoE=",
+    "hash": "sha256-X7afzXZIlchVVIufL3J0GiACxhS6QwAoMbJ3La+/6T8=",
     "fingerprinting": {
-      "AuntiesCleaners.Client.e3wdiov6rf.wasm": "AuntiesCleaners.Client.wasm",
+      "AuntiesCleaners.Client.lewop1b7pu.wasm": "AuntiesCleaners.Client.wasm",
       "Microsoft.AspNetCore.Components.m0bixtiu4c.wasm": "Microsoft.AspNetCore.Components.wasm",
       "Microsoft.AspNetCore.Components.Forms.rq2vd0tc2v.wasm": "Microsoft.AspNetCore.Components.Forms.wasm",
       "Microsoft.AspNetCore.Components.Web.1elehfqmua.wasm": "Microsoft.AspNetCore.Components.Web.wasm",
@@ -125,7 +125,7 @@
       "System.Runtime.InteropServices.JavaScript.a9apmv6un1.wasm": "sha256-LpJgtF19PIV5I74n8Lyhy929pa8LlCjBI5/8NoJYo6Y="
     },
     "assembly": {
-      "AuntiesCleaners.Client.e3wdiov6rf.wasm": "sha256-RvrZ7cHOqsuOBQmnLDP2jVKSgVcH3XASTMsXc9Mf/4w=",
+      "AuntiesCleaners.Client.lewop1b7pu.wasm": "sha256-83j4sV8hUrWOjTJuyAlqatWIOJTn/BdATx2m+XShdrU=",
       "Microsoft.AspNetCore.Components.m0bixtiu4c.wasm": "sha256-ugJSyhO5mMuFf5lTsdMAi/Whvg4Wt/LnQ1/7gbeU7Nk=",
       "Microsoft.AspNetCore.Components.Forms.rq2vd0tc2v.wasm": "sha256-XePOw4Z+OeufSwFCiMWnMVrbvM9QiA5GcdKbUBOv8xk=",
       "Microsoft.AspNetCore.Components.Web.1elehfqmua.wasm": "sha256-ydAkXiVom/hMvhgVjCurkm4peXLHktFChB1L/nBK6FI=",
