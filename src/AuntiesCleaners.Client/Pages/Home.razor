@@ -11,7 +11,7 @@
     {
         if (!AuthService.IsAuthenticated)
         {
-            Navigation.NavigateTo("/login");
+            Navigation.NavigateTo("login");
             return;
         }
 
@@ -34,6 +34,6 @@
                 return AllTabs.ByName[firstVisible.TabName].Route;
         }
 
-        return "/cleaning";
+        return "cleaning";
     }
 }
