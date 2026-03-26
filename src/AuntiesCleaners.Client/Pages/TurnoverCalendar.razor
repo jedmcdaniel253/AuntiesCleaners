@@ -72,6 +72,13 @@
             </MudStack>
         </MudStack>
 
+        <RoleGuard AllowedRoles="@(new[] { Role.Manager, Role.Boss, Role.Admin })">
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" Class="mb-3"
+                       OnClick="@(() => ShowAddForm(_selectedDay))">
+                Add Entry
+            </MudButton>
+        </RoleGuard>
+
         @if (!_dayEvents.Any())
         {
             <MudText Typo="Typo.body2" Color="Color.Secondary">No turnover entries for this day.</MudText>
@@ -104,13 +111,6 @@
                 </RowTemplate>
             </MudTable>
         }
-
-        <RoleGuard AllowedRoles="@(new[] { Role.Manager, Role.Boss, Role.Admin })">
-            <MudButton Variant="Variant.Outlined" Color="Color.Primary" Class="mt-3"
-                       OnClick="@(() => ShowAddForm(_selectedDay))">
-                Add Entry
-            </MudButton>
-        </RoleGuard>
     </MudPaper>
 }
 
