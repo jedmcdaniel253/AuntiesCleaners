@@ -7,7 +7,8 @@
         <MudForm @ref="_form">
             <MudStack Spacing="3">
                 <MudSelect T="Guid" Label="Worker" @bind-Value="_workerId" Variant="Variant.Outlined"
-                           Required="true" RequiredError="Worker is required">
+                           Required="true" RequiredError="Worker is required"
+                           ToStringFunc="@(id => Workers.FirstOrDefault(w => w.Id == id)?.Name ?? "")">
                     @foreach (var worker in Workers)
                     {
                         <MudSelectItem T="Guid" Value="@worker.Id">@worker.Name</MudSelectItem>
@@ -18,7 +19,8 @@
                                Required="true" RequiredError="Date is required" />
 
                 <MudSelect T="Guid" Label="House" @bind-Value="_houseId" Variant="Variant.Outlined"
-                           Required="true" RequiredError="House is required">
+                           Required="true" RequiredError="House is required"
+                           ToStringFunc="@(id => _filteredHouses.FirstOrDefault(h => h.Id == id)?.Name ?? "")">
                     @foreach (var house in _filteredHouses)
                     {
                         <MudSelectItem T="Guid" Value="@house.Id">@house.Name</MudSelectItem>

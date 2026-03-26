@@ -18,7 +18,8 @@
 
 <MudStack Row="true" AlignItems="AlignItems.Center" Class="my-4" Spacing="3">
     <MudSelect T="Guid?" Label="Worker" Value="_selectedWorkerId" ValueChanged="OnWorkerFilterChanged"
-               Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 300px;">
+               Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 300px;"
+               ToStringFunc="@(id => id == null ? "All Workers" : _workers.FirstOrDefault(w => w.Id == id)?.Name ?? "")">
         <MudSelectItem T="Guid?" Value="@((Guid?)null)">All Workers</MudSelectItem>
         @foreach (var worker in _workers)
         {

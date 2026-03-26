@@ -3,7 +3,8 @@
 @inject IHouseService HouseService
 
 <MudSelect T="Guid" Label="House" Value="Value" Variant="Variant.Outlined"
-           ValueChanged="OnValueChanged" Required="true" RequiredError="House is required">
+           ValueChanged="OnValueChanged" Required="true" RequiredError="House is required"
+           ToStringFunc="@(id => GetHouseName(id))">
     @foreach (var house in _houses)
     {
         <MudSelectItem T="Guid" Value="@house.Id">@house.Name</MudSelectItem>
@@ -42,4 +43,7 @@
         Value = newValue;
         await ValueChanged.InvokeAsync(Value);
     }
+
+    private string GetHouseName(Guid id) =>
+        _houses.FirstOrDefault(h => h.Id == id)?.Name ?? "";
 }

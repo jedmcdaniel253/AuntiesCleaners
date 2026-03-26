@@ -114,16 +114,7 @@
     </MudPaper>
 }
 
-@* Add/Edit form *@
-@if (_showEntryForm)
-{
-    <MudPaper Class="pa-4 mt-4" Elevation="2">
-        <MudText Typo="Typo.h6" Class="mb-3">@(_editingEvent != null ? "Edit" : "Add") Turnover Entry</MudText>
-        <TurnoverEntryForm Event="@_formEvent"
-                           OnSubmitted="OnFormSubmitted"
-                           OnCancelled="@(() => _showEntryForm = false)" />
-    </MudPaper>
-}
+@* Entry form shown as modal dialog *@
 
 @code {
     private DateTime _weekStart;
@@ -137,8 +128,6 @@
     private List<TurnoverEvent> _dayEvents = new();
 
     // Entry form state
-    private bool _showEntryForm;
-    private TurnoverEvent? _editingEvent;
     private TurnoverEvent _formEvent = new();
 
     protected override async Task OnInitializedAsync()
@@ -196,7 +185,6 @@
         _selectedHouseId = houseId;
         _dayEvents = _weekEvents.Where(e => e.EventDate.Date == day.Date).ToList();
         _showDayDrillDown = true;
-        _showEntryForm = false;
     }
 
     private string FormatDayLabel(DateTime day)
@@ -208,20 +196,29 @@
     }
 
     // CRUD
-    private void ShowAddForm(DateTime day)
+    private async Task ShowAddForm(DateTime day)
     {
-        _editingEvent = null;
         _formEvent = new TurnoverEvent
         {
             EventDate = day,
             HouseId = _selectedHouseId ?? Guid.Empty
         };
-        _showEntryForm = true;
+        var parameters = new DialogParameters<TurnoverEntryDialog>
+        {
+            { x => x.Event, _formEvent },
+            { x => x.IsEdit, false }
+        };
+        var dialog = await DialogService.ShowAsync<TurnoverEntryDialog>("Add Entry", parameters);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled)
+        {
+            await LoadData();
+            ShowDayDrillDown(_selectedDay, _selectedHouseId);
+        }
     }
 
-    private void EditEvent(TurnoverEvent evt)
+    private async Task EditEvent(TurnoverEvent evt)
     {
-        _editingEvent = evt;
         _formEvent = new TurnoverEvent
         {
             Id = evt.Id,
@@ -233,7 +230,18 @@
             CreatedBy = evt.CreatedBy,
             CreatedAt = evt.CreatedAt
         };
-        _showEntryForm = true;
+        var parameters = new DialogParameters<TurnoverEntryDialog>
+        {
+            { x => x.Event, _formEvent },
+            { x => x.IsEdit, true }
+        };
+        var dialog = await DialogService.ShowAsync<TurnoverEntryDialog>("Edit Entry", parameters);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled)
+        {
+            await LoadData();
+            ShowDayDrillDown(_selectedDay, _selectedHouseId);
+        }
     }
 
     private async Task DeleteEvent(TurnoverEvent evt)
@@ -252,30 +260,6 @@
             Snackbar.Add("Turnover entry deleted.", Severity.Success);
             await LoadData();
             ShowDayDrillDown(_selectedDay, _selectedHouseId);
-        }
-    }
-
-    private async Task OnFormSubmitted()
-    {
-        try
-        {
-            if (_editingEvent != null)
-            {
-                await TurnoverService.UpdateAsync(_formEvent);
-                Snackbar.Add("Turnover entry updated.", Severity.Success);
-            }
-            else
-            {
-                await TurnoverService.CreateAsync(_formEvent);
-                Snackbar.Add("Turnover entry added.", Severity.Success);
-            }
-            _showEntryForm = false;
-            await LoadData();
-            ShowDayDrillDown(_selectedDay, _selectedHouseId);
-        }
-        catch (Exception ex)
-        {
-            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
         }
     }
 

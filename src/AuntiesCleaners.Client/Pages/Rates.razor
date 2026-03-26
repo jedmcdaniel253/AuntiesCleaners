@@ -149,7 +149,8 @@
             <MudText Typo="Typo.h6" Class="mb-2">@(_editingRate?.Id != Guid.Empty ? "Edit" : "Add") Rate — @_editingCategory</MudText>
             @if (_editingRate?.Id == Guid.Empty)
             {
-                <MudSelect T="Guid?" Label="Worker" @bind-Value="_selectedWorkerId" Variant="Variant.Outlined" Class="mb-2">
+                <MudSelect T="Guid?" Label="Worker" @bind-Value="_selectedWorkerId" Variant="Variant.Outlined" Class="mb-2"
+                           ToStringFunc="@(id => _workers.FirstOrDefault(w => w.Id == id)?.Name ?? "")">
                     @foreach (var w in _workers)
                     {
                         <MudSelectItem T="Guid?" Value="@((Guid?)w.Id)">@w.Name</MudSelectItem>
@@ -175,7 +176,8 @@
             <MudText Typo="Typo.h6" Class="mb-2">@(_editingLawnRate?.Id != Guid.Empty ? "Edit" : "Add") Lawn Rate — @GetHouseName(_editingHouseId)</MudText>
             @if (_editingLawnRate?.Id == Guid.Empty)
             {
-                <MudSelect T="Guid?" Label="Worker" @bind-Value="_selectedWorkerId" Variant="Variant.Outlined" Class="mb-2">
+                <MudSelect T="Guid?" Label="Worker" @bind-Value="_selectedWorkerId" Variant="Variant.Outlined" Class="mb-2"
+                           ToStringFunc="@(id => _workers.FirstOrDefault(w => w.Id == id)?.Name ?? "")">
                     @foreach (var w in _workers)
                     {
                         <MudSelectItem T="Guid?" Value="@((Guid?)w.Id)">@w.Name</MudSelectItem>

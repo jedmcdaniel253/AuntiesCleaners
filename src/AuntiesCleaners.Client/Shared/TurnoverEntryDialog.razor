@@ -1,0 +1,46 @@
+@using AuntiesCleaners.Client.Models
+@using AuntiesCleaners.Client.Services
+@inject ITurnoverService TurnoverService
+@inject IAuthService AuthService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">@(IsEdit ? "Edit" : "Add") Turnover Entry</MudText>
+    </TitleContent>
+    <DialogContent>
+        <TurnoverEntryForm Event="@Event"
+                           OnSubmitted="HandleSubmit"
+                           OnCancelled="Cancel" />
+    </DialogContent>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public TurnoverEvent Event { get; set; } = new();
+    [Parameter] public bool IsEdit { get; set; }
+
+    private async Task HandleSubmit()
+    {
+        try
+        {
+            if (IsEdit)
+            {
+                await TurnoverService.UpdateAsync(Event);
+                Snackbar.Add("Turnover entry updated.", Severity.Success);
+            }
+            else
+            {
+                await TurnoverService.CreateAsync(Event);
+                Snackbar.Add("Turnover entry added.", Severity.Success);
+            }
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

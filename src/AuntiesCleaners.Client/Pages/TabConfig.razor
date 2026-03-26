@@ -11,7 +11,8 @@
     <MudText Typo="Typo.h5" Class="mb-4">Tab Configuration</MudText>
 
     <MudSelect T="Guid?" Label="Select User" Value="_selectedUserId" Variant="Variant.Outlined" Class="mb-4"
-               ValueChanged="OnUserSelected">
+               ValueChanged="OnUserSelected"
+               ToStringFunc="@(id => _users.FirstOrDefault(u => u.Id == id)?.Name ?? "")">
         @foreach (var user in _users)
         {
             <MudSelectItem T="Guid?" Value="@user.Id">@user.Name (@user.RoleValue)</MudSelectItem>
