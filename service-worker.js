@@ -1,4 +1,4 @@
-/* Manifest version: Mb94QxUc */
+/* Manifest version: r/q24y3r */
 // Caution! Be sure you understand the caveats before publishing an application with
 // offline support. See https://aka.ms/blazor-offline-considerations
 
@@ -20,6 +20,9 @@ const manifestUrlList = self.assetsManifest.assets.map(asset => new URL(asset.ur
 async function onInstall(event) {
     console.info('Service worker: Install');
 
+    // Skip waiting so the new service worker activates immediately
+    self.skipWaiting();
+
     // Fetch and cache all matching items from the assets manifest
     const assetsRequests = self.assetsManifest.assets
         .filter(asset => offlineAssetsInclude.some(pattern => pattern.test(asset.url)))
@@ -31,11 +34,18 @@ async function onInstall(event) {
 async function onActivate(event) {
     console.info('Service worker: Activate');
 
+    // Take control of all clients immediately
+    self.clients.claim();
+
     // Delete unused caches
     const cacheKeys = await caches.keys();
     await Promise.all(cacheKeys
         .filter(key => key.startsWith(cacheNamePrefix) && key !== cacheName)
         .map(key => caches.delete(key)));
+
+    // Notify all clients to reload with the new version
+    const clients = await self.clients.matchAll({ type: 'window' });
+    clients.forEach(client => client.postMessage({ type: 'SW_UPDATED' }));
 }
 
 async function onFetch(event) {
@@ -43,7 +53,6 @@ async function onFetch(event) {
     if (event.request.method === 'GET') {
         // For all navigation requests, try to serve index.html from cache,
         // unless that request is for an offline resource.
-        // If you need some URLs to be server-rendered, edit the following check to exclude those URLs
         const shouldServeIndexHtml = event.request.mode === 'navigate'
             && !manifestUrlList.some(url => url === event.request.url);
 
