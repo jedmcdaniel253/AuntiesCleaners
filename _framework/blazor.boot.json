@@ -1,9 +1,9 @@
 {
   "mainAssemblyName": "AuntiesCleaners.Client",
   "resources": {
-    "hash": "sha256-NadQXsxBJnHovN3Vvp924v29OE5fHv5J2QVFDsJvu0Y=",
+    "hash": "sha256-WH+DaHP7Lfix7ZkhkzoBxQoenZstdTmoqURXPcvY2e4=",
     "fingerprinting": {
-      "AuntiesCleaners.Client.6d7iotmmem.wasm": "AuntiesCleaners.Client.wasm",
+      "AuntiesCleaners.Client.innhwu7ozu.wasm": "AuntiesCleaners.Client.wasm",
       "Microsoft.AspNetCore.Components.m0bixtiu4c.wasm": "Microsoft.AspNetCore.Components.wasm",
       "Microsoft.AspNetCore.Components.Forms.rq2vd0tc2v.wasm": "Microsoft.AspNetCore.Components.Forms.wasm",
       "Microsoft.AspNetCore.Components.Web.1elehfqmua.wasm": "Microsoft.AspNetCore.Components.Web.wasm",
@@ -28,7 +28,7 @@
       "Microsoft.JSInterop.WebAssembly.3eqovhfme2.wasm": "Microsoft.JSInterop.WebAssembly.wasm",
       "Microsoft.JSInterop.4yfioe4yc3.wasm": "Microsoft.JSInterop.wasm",
       "MimeMapping.gmxjevqz69.wasm": "MimeMapping.wasm",
-      "MudBlazor.u7p0srosgj.wasm": "MudBlazor.wasm",
+      "MudBlazor.7ibbmfz5yk.wasm": "MudBlazor.wasm",
       "Newtonsoft.Json.qkbufwhni2.wasm": "Newtonsoft.Json.wasm",
       "Supabase.Core.zcuz262cdn.wasm": "Supabase.Core.wasm",
       "Supabase.Functions.das9utiwul.wasm": "Supabase.Functions.wasm",
@@ -125,7 +125,7 @@
       "System.Runtime.InteropServices.JavaScript.a9apmv6un1.wasm": "sha256-LpJgtF19PIV5I74n8Lyhy929pa8LlCjBI5/8NoJYo6Y="
     },
     "assembly": {
-      "AuntiesCleaners.Client.6d7iotmmem.wasm": "sha256-Nn5sU8R74AjqQ7CbggD6cWrX+LO/WW/HnxsMVMTjJAQ=",
+      "AuntiesCleaners.Client.innhwu7ozu.wasm": "sha256-/lmaQYqD3nB30rwfuaJ5ClNbg41EthNLYXI7jR/COkg=",
       "Microsoft.AspNetCore.Components.m0bixtiu4c.wasm": "sha256-ugJSyhO5mMuFf5lTsdMAi/Whvg4Wt/LnQ1/7gbeU7Nk=",
       "Microsoft.AspNetCore.Components.Forms.rq2vd0tc2v.wasm": "sha256-XePOw4Z+OeufSwFCiMWnMVrbvM9QiA5GcdKbUBOv8xk=",
       "Microsoft.AspNetCore.Components.Web.1elehfqmua.wasm": "sha256-ydAkXiVom/hMvhgVjCurkm4peXLHktFChB1L/nBK6FI=",
@@ -150,7 +150,7 @@
       "Microsoft.JSInterop.WebAssembly.3eqovhfme2.wasm": "sha256-m25C+4KzrQ8N9ocX5azt/nEZs1k9ugxXoGqSgWnO9gE=",
       "Microsoft.JSInterop.4yfioe4yc3.wasm": "sha256-xA6uGG4S/6zGZ0sUSo3p3ZN2npR1bCe6oKwaD4YW6nU=",
       "MimeMapping.gmxjevqz69.wasm": "sha256-CMXcRIg84k7AstbhcD8rbnPKy2wa/gmsBD8gBgZP1c8=",
-      "MudBlazor.u7p0srosgj.wasm": "sha256-VhgOHp6AW8fY9PNNd2PE+1NSDVcZObGZKmWKPaG/ais=",
+      "MudBlazor.7ibbmfz5yk.wasm": "sha256-AQ88ary7a/ruKvtvxF675q942nRrmOSDLA17zg7MZ6Y=",
       "Newtonsoft.Json.qkbufwhni2.wasm": "sha256-GlXMWKvDs45M2pACoR3Y4Qh8mcrOZGljqmvJY+6JZ5s=",
       "Supabase.Core.zcuz262cdn.wasm": "sha256-jUEh1mM6mkGdyQrEwowAbpQ8R148PZIAUIOXn0mrgIA=",
       "Supabase.Functions.das9utiwul.wasm": "sha256-i3baKTpUA4voBHgpG1KCEXhOQom7BsRz3N4FCywsZ6k=",
