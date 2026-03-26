@@ -1,0 +1,70 @@
+@using AuntiesCleaners.Client.Models
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">@(IsEdit ? "Edit" : "Add") @Label</MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (!IsEdit)
+        {
+            <MudSelect T="Guid?" Label="Worker" @bind-Value="_selectedWorkerId" Variant="Variant.Outlined" Class="mb-2"
+                       ToStringFunc="@(id => Workers.FirstOrDefault(w => w.Id == id)?.Name ?? "")">
+                @foreach (var w in Workers)
+                {
+                    <MudSelectItem T="Guid?" Value="@((Guid?)w.Id)">@w.Name</MudSelectItem>
+                }
+            </MudSelect>
+        }
+        else
+        {
+            <MudText Class="mb-2">Worker: @WorkerName</MudText>
+        }
+        <MudNumericField T="decimal" Label="Rate Charged" @bind-Value="_rateCharged" Min="0.01M" Variant="Variant.Outlined" Class="mb-2" />
+        <MudNumericField T="decimal" Label="Rate Paid" @bind-Value="_ratePaid" Min="0M" Variant="Variant.Outlined" Class="mb-2" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Save">Save</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public string Label { get; set; } = "Rate";
+    [Parameter] public bool IsEdit { get; set; }
+    [Parameter] public string WorkerName { get; set; } = "";
+    [Parameter] public decimal RateCharged { get; set; }
+    [Parameter] public decimal RatePaid { get; set; }
+    [Parameter] public Guid? WorkerId { get; set; }
+    [Parameter] public List<Worker> Workers { get; set; } = new();
+
+    private Guid? _selectedWorkerId;
+    private decimal _rateCharged;
+    private decimal _ratePaid;
+
+    protected override void OnInitialized()
+    {
+        _selectedWorkerId = WorkerId;
+        _rateCharged = RateCharged;
+        _ratePaid = RatePaid;
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private void Save()
+    {
+        if (!IsEdit && _selectedWorkerId == null)
+        {
+            return; // worker required for new rates
+        }
+        if (_rateCharged <= 0) return;
+        if (_ratePaid < 0) return;
+
+        MudDialog.Close(DialogResult.Ok(new WorkerRateResult
+        {
+            WorkerId = _selectedWorkerId,
+            RateCharged = _rateCharged,
+            RatePaid = _ratePaid
+        }));
+    }
+}

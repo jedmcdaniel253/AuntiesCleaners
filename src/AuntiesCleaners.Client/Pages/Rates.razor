@@ -6,13 +6,14 @@
 @inject IWorkerService WorkerService
 @inject IHouseService HouseService
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
 
 <RoleGuard AllowedRoles="@(new[] { Role.Boss, Role.Admin })">
     <MudText Typo="Typo.h5" Class="mb-4">Rates</MudText>
 
     <MudExpansionPanels MultiExpansion="true">
         @* Section 1: Cleaning & Maintenance Hourly Rates *@
-        <MudExpansionPanel Text="Cleaning / Maintenance Hourly Rates" IsInitiallyExpanded="true">
+        <MudExpansionPanel Text="Cleaning / Maintenance Hourly Rates" Expanded="true">
             @foreach (var category in new[] { "Cleaning", "Maintenance" })
             {
                 var defaultRate = GetDefaultRate(category);
@@ -21,12 +22,12 @@
                     <MudText Typo="Typo.subtitle2" Class="mb-2">Default Rate</MudText>
                     <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
                         <MudNumericField T="decimal" Label="Rate Charged ($/hr)" Min="0.01M"
-                                         Value="@(defaultRate?.RateCharged ?? 0)"
-                                         ValueChanged="@(v => OnDefaultRateChanged(category, v, defaultRate?.RatePaid ?? 0))"
+                                         Value="@(GetDefaultRateCharged(category))"
+                                         ValueChanged="@(v => OnDefaultRateChargedChanged(category, v))"
                                          Variant="Variant.Outlined" Style="max-width:180px" />
                         <MudNumericField T="decimal" Label="Rate Paid ($/hr)" Min="0M"
-                                         Value="@(defaultRate?.RatePaid ?? 0)"
-                                         ValueChanged="@(v => OnDefaultRateChanged(category, defaultRate?.RateCharged ?? 0, v))"
+                                         Value="@(GetDefaultRatePaid(category))"
+                                         ValueChanged="@(v => OnDefaultRatePaidChanged(category, v))"
                                          Variant="Variant.Outlined" Style="max-width:180px" />
                         <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
                                    OnClick="@(() => SaveDefaultRate(category))">Save</MudButton>
@@ -62,12 +63,12 @@
                 <MudText Typo="Typo.subtitle2" Class="mb-2">Default Rate</MudText>
                 <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
                     <MudNumericField T="decimal" Label="Rate Charged ($/load)" Min="0.01M"
-                                     Value="@(GetDefaultRate("Laundry")?.RateCharged ?? 0)"
-                                     ValueChanged="@(v => OnDefaultRateChanged("Laundry", v, GetDefaultRate("Laundry")?.RatePaid ?? 0))"
+                                     Value="@(GetDefaultRateCharged("Laundry"))"
+                                     ValueChanged="@(v => OnDefaultRateChargedChanged("Laundry", v))"
                                      Variant="Variant.Outlined" Style="max-width:180px" />
                     <MudNumericField T="decimal" Label="Rate Paid ($/load)" Min="0M"
-                                     Value="@(GetDefaultRate("Laundry")?.RatePaid ?? 0)"
-                                     ValueChanged="@(v => OnDefaultRateChanged("Laundry", GetDefaultRate("Laundry")?.RateCharged ?? 0, v))"
+                                     Value="@(GetDefaultRatePaid("Laundry"))"
+                                     ValueChanged="@(v => OnDefaultRatePaidChanged("Laundry", v))"
                                      Variant="Variant.Outlined" Style="max-width:180px" />
                     <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
                                OnClick="@(() => SaveDefaultRate("Laundry"))">Save</MudButton>
@@ -142,60 +143,7 @@
         </MudExpansionPanel>
     </MudExpansionPanels>
 
-    @* Rate edit/add form *@
-    @if (_showRateForm)
-    {
-        <MudPaper Class="pa-4 mt-4" Elevation="2">
-            <MudText Typo="Typo.h6" Class="mb-2">@(_editingRate?.Id != Guid.Empty ? "Edit" : "Add") Rate — @_editingCategory</MudText>
-            @if (_editingRate?.Id == Guid.Empty)
-            {
-                <MudSelect T="Guid?" Label="Worker" @bind-Value="_selectedWorkerId" Variant="Variant.Outlined" Class="mb-2"
-                           ToStringFunc="@(id => _workers.FirstOrDefault(w => w.Id == id)?.Name ?? "")">
-                    @foreach (var w in _workers)
-                    {
-                        <MudSelectItem T="Guid?" Value="@((Guid?)w.Id)">@w.Name</MudSelectItem>
-                    }
-                </MudSelect>
-            }
-            else
-            {
-                <MudText Class="mb-2">Worker: @GetWorkerName(_editingRate?.WorkerId)</MudText>
-            }
-            <MudNumericField T="decimal" Label="Rate Charged" @bind-Value="_formRateCharged" Min="0.01M" Variant="Variant.Outlined" Class="mb-2" />
-            <MudNumericField T="decimal" Label="Rate Paid" @bind-Value="_formRatePaid" Min="0M" Variant="Variant.Outlined" Class="mb-2" />
-            <MudStack Row="true" Spacing="2">
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveWorkerRateForm">Save</MudButton>
-                <MudButton Variant="Variant.Text" OnClick="@(() => _showRateForm = false)">Cancel</MudButton>
-            </MudStack>
-        </MudPaper>
-    }
-
-    @if (_showLawnRateForm)
-    {
-        <MudPaper Class="pa-4 mt-4" Elevation="2">
-            <MudText Typo="Typo.h6" Class="mb-2">@(_editingLawnRate?.Id != Guid.Empty ? "Edit" : "Add") Lawn Rate — @GetHouseName(_editingHouseId)</MudText>
-            @if (_editingLawnRate?.Id == Guid.Empty)
-            {
-                <MudSelect T="Guid?" Label="Worker" @bind-Value="_selectedWorkerId" Variant="Variant.Outlined" Class="mb-2"
-                           ToStringFunc="@(id => _workers.FirstOrDefault(w => w.Id == id)?.Name ?? "")">
-                    @foreach (var w in _workers)
-                    {
-                        <MudSelectItem T="Guid?" Value="@((Guid?)w.Id)">@w.Name</MudSelectItem>
-                    }
-                </MudSelect>
-            }
-            else
-            {
-                <MudText Class="mb-2">Worker: @GetWorkerName(_editingLawnRate?.WorkerId)</MudText>
-            }
-            <MudNumericField T="decimal" Label="Rate Charged" @bind-Value="_formRateCharged" Min="0.01M" Variant="Variant.Outlined" Class="mb-2" />
-            <MudNumericField T="decimal" Label="Rate Paid" @bind-Value="_formRatePaid" Min="0M" Variant="Variant.Outlined" Class="mb-2" />
-            <MudStack Row="true" Spacing="2">
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveWorkerLawnRateForm">Save</MudButton>
-                <MudButton Variant="Variant.Text" OnClick="@(() => _showLawnRateForm = false)">Cancel</MudButton>
-            </MudStack>
-        </MudPaper>
-    }
+    @* Rate forms shown as modal dialogs *@
 </RoleGuard>
 
 @code {
@@ -203,19 +151,6 @@
     private List<LawnHouseRate> _lawnRates = new();
     private List<Worker> _workers = new();
     private List<House> _houses = new();
-
-    // Rate form state
-    private bool _showRateForm;
-    private Rate? _editingRate;
-    private string _editingCategory = string.Empty;
-    private decimal _formRateCharged;
-    private decimal _formRatePaid;
-    private Guid? _selectedWorkerId;
-
-    // Lawn rate form state
-    private bool _showLawnRateForm;
-    private LawnHouseRate? _editingLawnRate;
-    private Guid _editingHouseId;
 
     // Temporary state for default rate edits
     private Dictionary<string, (decimal Charged, decimal Paid)> _defaultRateEdits = new();
@@ -267,6 +202,24 @@
     private void OnDefaultRateChanged(string category, decimal charged, decimal paid)
     {
         _defaultRateEdits[category] = (charged, paid);
+    }
+
+    private decimal GetDefaultRateCharged(string category) =>
+        _defaultRateEdits.TryGetValue(category, out var e) ? e.Charged : GetDefaultRate(category)?.RateCharged ?? 0;
+
+    private decimal GetDefaultRatePaid(string category) =>
+        _defaultRateEdits.TryGetValue(category, out var e) ? e.Paid : GetDefaultRate(category)?.RatePaid ?? 0;
+
+    private void OnDefaultRateChargedChanged(string category, decimal value)
+    {
+        var paid = GetDefaultRatePaid(category);
+        _defaultRateEdits[category] = (value, paid);
+    }
+
+    private void OnDefaultRatePaidChanged(string category, decimal value)
+    {
+        var charged = GetDefaultRateCharged(category);
+        _defaultRateEdits[category] = (charged, value);
     }
 
     private async Task SaveDefaultRate(string category)
@@ -348,121 +301,107 @@
 
     // --- Worker rate form ---
 
-    private void ShowAddWorkerRate(string category)
+    private async Task ShowAddWorkerRate(string category)
     {
-        _editingRate = new Rate { WorkCategoryValue = category };
-        _editingCategory = category;
-        _formRateCharged = 0;
-        _formRatePaid = 0;
-        _selectedWorkerId = null;
-        _showRateForm = true;
-        _showLawnRateForm = false;
-    }
-
-    private void EditWorkerRate(Rate rate)
-    {
-        _editingRate = rate;
-        _editingCategory = rate.WorkCategoryValue;
-        _formRateCharged = rate.RateCharged;
-        _formRatePaid = rate.RatePaid;
-        _selectedWorkerId = rate.WorkerId;
-        _showRateForm = true;
-        _showLawnRateForm = false;
-    }
-
-    private async Task SaveWorkerRateForm()
-    {
-        if (_editingRate!.Id == Guid.Empty && _selectedWorkerId == null)
+        var parameters = new DialogParameters<WorkerRateDialog>
         {
-            Snackbar.Add("Please select a worker.", Severity.Error);
-            return;
-        }
-        if (_formRateCharged <= 0)
+            { x => x.Label, $"Rate — {category}" },
+            { x => x.IsEdit, false },
+            { x => x.Workers, _workers }
+        };
+        var dialog = await DialogService.ShowAsync<WorkerRateDialog>("Add Worker Rate", parameters);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled)
         {
-            Snackbar.Add("Rate charged must be greater than zero.", Severity.Error);
-            return;
-        }
-        if (_formRatePaid < 0)
-        {
-            Snackbar.Add("Rate paid cannot be negative.", Severity.Error);
-            return;
-        }
-
-        _editingRate!.RateCharged = _formRateCharged;
-        _editingRate.RatePaid = _formRatePaid;
-        if (_editingRate.Id == Guid.Empty)
-            _editingRate.WorkerId = _selectedWorkerId;
-
-        try
-        {
-            await RateService.CreateOrUpdateAsync(_editingRate);
+            var data = (WorkerRateResult)result.Data!;
+            var rate = new Rate
+            {
+                WorkCategoryValue = category,
+                WorkerId = data.WorkerId,
+                RateCharged = data.RateCharged,
+                RatePaid = data.RatePaid
+            };
+            await RateService.CreateOrUpdateAsync(rate);
             Snackbar.Add("Worker rate saved.", Severity.Success);
-            _showRateForm = false;
             await LoadData();
         }
-        catch (ArgumentException ex)
+    }
+
+    private async Task EditWorkerRate(Rate rate)
+    {
+        var parameters = new DialogParameters<WorkerRateDialog>
         {
-            Snackbar.Add(ex.Message, Severity.Error);
+            { x => x.Label, $"Rate — {rate.WorkCategoryValue}" },
+            { x => x.IsEdit, true },
+            { x => x.WorkerName, GetWorkerName(rate.WorkerId) },
+            { x => x.WorkerId, rate.WorkerId },
+            { x => x.RateCharged, rate.RateCharged },
+            { x => x.RatePaid, rate.RatePaid },
+            { x => x.Workers, _workers }
+        };
+        var dialog = await DialogService.ShowAsync<WorkerRateDialog>("Edit Worker Rate", parameters);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled)
+        {
+            var data = (WorkerRateResult)result.Data!;
+            rate.RateCharged = data.RateCharged;
+            rate.RatePaid = data.RatePaid;
+            await RateService.CreateOrUpdateAsync(rate);
+            Snackbar.Add("Worker rate saved.", Severity.Success);
+            await LoadData();
         }
     }
 
     // --- Worker lawn rate form ---
 
-    private void ShowAddWorkerLawnRate(Guid houseId)
+    private async Task ShowAddWorkerLawnRate(Guid houseId)
     {
-        _editingLawnRate = new LawnHouseRate { HouseId = houseId };
-        _editingHouseId = houseId;
-        _formRateCharged = 0;
-        _formRatePaid = 0;
-        _selectedWorkerId = null;
-        _showLawnRateForm = true;
-        _showRateForm = false;
-    }
-
-    private void EditWorkerLawnRate(LawnHouseRate rate)
-    {
-        _editingLawnRate = rate;
-        _editingHouseId = rate.HouseId;
-        _formRateCharged = rate.RateCharged;
-        _formRatePaid = rate.RatePaid;
-        _selectedWorkerId = rate.WorkerId;
-        _showLawnRateForm = true;
-        _showRateForm = false;
-    }
-
-    private async Task SaveWorkerLawnRateForm()
-    {
-        if (_editingLawnRate!.Id == Guid.Empty && _selectedWorkerId == null)
+        var parameters = new DialogParameters<WorkerRateDialog>
         {
-            Snackbar.Add("Please select a worker.", Severity.Error);
-            return;
-        }
-        if (_formRateCharged <= 0)
+            { x => x.Label, $"Lawn Rate — {GetHouseName(houseId)}" },
+            { x => x.IsEdit, false },
+            { x => x.Workers, _workers }
+        };
+        var dialog = await DialogService.ShowAsync<WorkerRateDialog>("Add Lawn Worker Rate", parameters);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled)
         {
-            Snackbar.Add("Rate charged must be greater than zero.", Severity.Error);
-            return;
-        }
-        if (_formRatePaid < 0)
-        {
-            Snackbar.Add("Rate paid cannot be negative.", Severity.Error);
-            return;
-        }
-
-        _editingLawnRate!.RateCharged = _formRateCharged;
-        _editingLawnRate.RatePaid = _formRatePaid;
-        if (_editingLawnRate.Id == Guid.Empty)
-            _editingLawnRate.WorkerId = _selectedWorkerId;
-
-        try
-        {
-            await RateService.CreateOrUpdateLawnRateAsync(_editingLawnRate);
-            Snackbar.Add("Worker lawn rate saved.", Severity.Success);
-            _showLawnRateForm = false;
+            var data = (WorkerRateResult)result.Data!;
+            var rate = new LawnHouseRate
+            {
+                HouseId = houseId,
+                WorkerId = data.WorkerId,
+                RateCharged = data.RateCharged,
+                RatePaid = data.RatePaid
+            };
+            await RateService.CreateOrUpdateLawnRateAsync(rate);
+            Snackbar.Add("Lawn worker rate saved.", Severity.Success);
             await LoadData();
         }
-        catch (ArgumentException ex)
+    }
+
+    private async Task EditWorkerLawnRate(LawnHouseRate rate)
+    {
+        var parameters = new DialogParameters<WorkerRateDialog>
         {
-            Snackbar.Add(ex.Message, Severity.Error);
+            { x => x.Label, $"Lawn Rate — {GetHouseName(rate.HouseId)}" },
+            { x => x.IsEdit, true },
+            { x => x.WorkerName, GetWorkerName(rate.WorkerId) },
+            { x => x.WorkerId, rate.WorkerId },
+            { x => x.RateCharged, rate.RateCharged },
+            { x => x.RatePaid, rate.RatePaid },
+            { x => x.Workers, _workers }
+        };
+        var dialog = await DialogService.ShowAsync<WorkerRateDialog>("Edit Lawn Worker Rate", parameters);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled)
+        {
+            var data = (WorkerRateResult)result.Data!;
+            rate.RateCharged = data.RateCharged;
+            rate.RatePaid = data.RatePaid;
+            await RateService.CreateOrUpdateLawnRateAsync(rate);
+            Snackbar.Add("Lawn worker rate saved.", Severity.Success);
+            await LoadData();
         }
     }
 }

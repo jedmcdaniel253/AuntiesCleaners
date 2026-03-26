@@ -99,10 +99,10 @@
                     <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
                                    OnClick="@(() => StartEditRole(context))" />
                     <MudIconButton Icon="@Icons.Material.Filled.Email" Size="Size.Small" Color="Color.Info"
-                                   Title="Resend Invite"
+                                   aria-label="Resend Invite"
                                    OnClick="@(() => ResendInvite(context))" />
                     <MudIconButton Icon="@Icons.Material.Filled.Share" Size="Size.Small" Color="Color.Primary"
-                                   Title="Share App Link"
+                                   aria-label="Share App Link"
                                    OnClick="@(() => ShareAppLink())" />
                     @if (context.IsActive)
                     {
