@@ -2,10 +2,13 @@
 @using AuntiesCleaners.Client.Models
 @using AuntiesCleaners.Client.Services
 @using AuntiesCleaners.Client.Shared
+@using AuntiesCleaners.Client.Helpers
+@using AuntiesCleaners.Client.Components
 @inject ITurnoverService TurnoverService
 @inject IHouseService HouseService
 @inject IAuthService AuthService
 @inject IShareService ShareService
+@inject IOwnerService OwnerService
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
 
@@ -273,12 +276,54 @@
             return;
         }
 
-        var label = FormatDayLabel(_selectedDay);
-        var lines = _dayEvents
-            .Select(e => $"{GetHouseName(e.HouseId)} → {e.DisplayLabel}")
-            .ToList();
-        var text = $"{label}\n{string.Join("\n", lines)}";
+        List<Owner> owners;
+        try
+        {
+            owners = await OwnerService.GetAllAsync();
+        }
+        catch (Exception)
+        {
+            Snackbar.Add("Failed to load owners.", Severity.Error);
+            return;
+        }
 
-        await ShareService.ShareTextAsync("Turnover Schedule", text);
+        var parameters = new DialogParameters<ShareDayDialog>
+        {
+            { x => x.Owners, owners }
+        };
+        var dialog = await DialogService.ShowAsync<ShareDayDialog>("Share Day", parameters);
+        var result = await dialog.Result;
+
+        if (result is null || result.Canceled)
+            return;
+
+        var shareDayResult = (ShareDayResult)result.Data!;
+        var label = FormatDayLabel(_selectedDay);
+
+        try
+        {
+            if (shareDayResult.Mode == ShareMode.Workers)
+            {
+                var text = ShareTextComposer.ComposeWorkerText(label, _dayEvents, GetHouseName);
+                await ShareService.ShareTextAsync("Turnover Schedule", text);
+            }
+            else
+            {
+                var owner = shareDayResult.SelectedOwner!;
+                var text = ShareTextComposer.ComposeOwnerText(label, owner.Name, _dayEvents, _houses, owner.Id);
+
+                if (string.IsNullOrEmpty(text))
+                {
+                    Snackbar.Add($"No entries to share for {owner.Name}.", Severity.Info);
+                    return;
+                }
+
+                await ShareService.ShareTextAsync($"{owner.Name} Schedule", text);
+            }
+        }
+        catch (Exception)
+        {
+            Snackbar.Add("Failed to share schedule.", Severity.Error);
+        }
     }
 }

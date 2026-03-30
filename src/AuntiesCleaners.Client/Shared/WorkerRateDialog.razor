@@ -19,7 +19,7 @@
         {
             <MudText Class="mb-2">Worker: @WorkerName</MudText>
         }
-        <MudNumericField T="decimal" Label="Rate Charged" @bind-Value="_rateCharged" Min="0.01M" Variant="Variant.Outlined" Class="mb-2" />
+        <MudNumericField T="decimal" Label="Rate Charged" @bind-Value="_rateCharged" Min="0M" Variant="Variant.Outlined" Class="mb-2" />
         <MudNumericField T="decimal" Label="Rate Paid" @bind-Value="_ratePaid" Min="0M" Variant="Variant.Outlined" Class="mb-2" />
     </DialogContent>
     <DialogActions>
@@ -57,7 +57,7 @@
         {
             return; // worker required for new rates
         }
-        if (_rateCharged <= 0) return;
+        if (_rateCharged < 0) return;
         if (_ratePaid < 0) return;
 
         MudDialog.Close(DialogResult.Ok(new WorkerRateResult

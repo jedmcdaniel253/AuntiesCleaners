@@ -33,7 +33,7 @@ public class RateService : IRateService
 
     public async Task<Rate> CreateOrUpdateAsync(Rate rate)
     {
-        ValidateRate(rate.RateCharged, rate.RatePaid);
+        ValidateRate(rate.RateCharged, rate.RatePaid, isWorkerOverride: rate.WorkerId != null);
         rate.UpdatedAt = DateTime.UtcNow;
 
         if (rate.Id == Guid.Empty)
@@ -76,7 +76,7 @@ public class RateService : IRateService
 
     public async Task<LawnHouseRate> CreateOrUpdateLawnRateAsync(LawnHouseRate rate)
     {
-        ValidateRate(rate.RateCharged, rate.RatePaid);
+        ValidateRate(rate.RateCharged, rate.RatePaid, isWorkerOverride: rate.WorkerId != null);
         rate.UpdatedAt = DateTime.UtcNow;
 
         if (rate.Id == Guid.Empty)
@@ -92,10 +92,12 @@ public class RateService : IRateService
         }
     }
 
-    public static void ValidateRate(decimal rateCharged, decimal ratePaid)
+    public static void ValidateRate(decimal rateCharged, decimal ratePaid, bool isWorkerOverride = false)
     {
-        if (rateCharged <= 0)
+        if (!isWorkerOverride && rateCharged <= 0)
             throw new ArgumentException("Rate charged must be greater than zero.", nameof(rateCharged));
+        if (isWorkerOverride && rateCharged < 0)
+            throw new ArgumentException("Rate charged must be zero or positive.", nameof(rateCharged));
         if (ratePaid < 0)
             throw new ArgumentException("Rate paid must be zero or positive.", nameof(ratePaid));
     }

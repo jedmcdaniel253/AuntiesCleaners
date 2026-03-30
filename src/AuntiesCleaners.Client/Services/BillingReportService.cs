@@ -70,14 +70,16 @@ public class BillingReportService : IBillingReportService
         var section = new BillingSection { Name = sectionName };
 
         var grouped = entries
-            .GroupBy(e => new { e.HouseId, e.EntryDate.Date })
+            .GroupBy(e => new { e.HouseId, e.EntryDate.Date, e.WorkerId })
             .OrderBy(g => g.Key.Date)
             .ThenBy(g => houseMap.GetValueOrDefault(g.Key.HouseId, "Unknown"));
 
         foreach (var group in grouped)
         {
             var totalHours = group.Sum(e => e.HoursBilled ?? 0);
-            var rateCharged = defaultRate?.RateCharged ?? 0;
+            var workerId = group.Key.WorkerId;
+            var workerRate = rates.FirstOrDefault(r => r.WorkerId == workerId);
+            var rateCharged = workerRate?.RateCharged ?? defaultRate?.RateCharged ?? 0;
             var houseName = houseMap.GetValueOrDefault(group.Key.HouseId, "Unknown");
             var amount = totalHours * rateCharged;
 
@@ -103,7 +105,8 @@ public class BillingReportService : IBillingReportService
         foreach (var entry in entries)
         {
             var loads = entry.NumberOfLoads ?? 0;
-            var rateCharged = defaultRate?.RateCharged ?? 0;
+            var workerRate = rates.FirstOrDefault(r => r.WorkerId == entry.WorkerId);
+            var rateCharged = workerRate?.RateCharged ?? defaultRate?.RateCharged ?? 0;
             var houseName = houseMap.GetValueOrDefault(entry.HouseId, "Unknown");
             var amount = loads * rateCharged;
 
@@ -126,8 +129,9 @@ public class BillingReportService : IBillingReportService
 
         foreach (var entry in entries)
         {
+            var workerLawnRate = lawnRates.FirstOrDefault(r => r.HouseId == entry.HouseId && r.WorkerId == entry.WorkerId);
             var defaultLawnRate = lawnRates.FirstOrDefault(r => r.HouseId == entry.HouseId && r.WorkerId == null);
-            var rateCharged = defaultLawnRate?.RateCharged ?? 0;
+            var rateCharged = workerLawnRate?.RateCharged ?? defaultLawnRate?.RateCharged ?? 0;
             var houseName = houseMap.GetValueOrDefault(entry.HouseId, "Unknown");
 
             section.LineItems.Add(new BillingLineItem

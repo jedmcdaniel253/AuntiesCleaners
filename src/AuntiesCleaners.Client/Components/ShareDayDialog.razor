@@ -1,0 +1,39 @@
+@using AuntiesCleaners.Client.Models
+
+<MudDialog>
+    <DialogContent>
+        <MudRadioGroup @bind-Value="_mode">
+            <MudRadio Value="ShareMode.Workers" Color="Color.Primary">Share with Workers</MudRadio>
+            <MudRadio Value="ShareMode.Owner" Color="Color.Primary">Share with Owner</MudRadio>
+        </MudRadioGroup>
+
+        @if (_mode == ShareMode.Owner)
+        {
+            <MudSelect T="Owner" @bind-Value="_selectedOwner" Label="Select Owner" Variant="Variant.Outlined" Class="mt-4">
+                @foreach (var owner in Owners)
+                {
+                    <MudSelectItem T="Owner" Value="owner">@owner.Name</MudSelectItem>
+                }
+            </MudSelect>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit" Disabled="_confirmDisabled">Confirm</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter] public List<Owner> Owners { get; set; } = new();
+
+    private ShareMode _mode = ShareMode.Workers;
+    private Owner? _selectedOwner;
+
+    private bool _confirmDisabled => _mode == ShareMode.Owner && _selectedOwner is null;
+
+    private void Submit() => MudDialog.Close(DialogResult.Ok(new ShareDayResult(_mode, _selectedOwner)));
+
+    private void Cancel() => MudDialog.Cancel();
+}

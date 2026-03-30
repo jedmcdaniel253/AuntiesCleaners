@@ -11,4 +11,5 @@ public class House : BaseModel
     [Column("is_multiple_houses")] public bool IsMultipleHouses { get; set; }
     [Column("is_active")] public bool IsActive { get; set; } = true;
     [Column("created_at")] public DateTime CreatedAt { get; set; }
+    [Column("owner_id")] public Guid? OwnerId { get; set; }
 }
