@@ -8,6 +8,7 @@
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
 @inject IJSRuntime JS
+@inject HttpClient HttpClient
 
 <MudContainer MaxWidth="MaxWidth.Small" Class="mt-4">
     <MudText Typo="Typo.h5" Class="mb-4">Receipts</MudText>
@@ -116,6 +117,22 @@
     private async Task ShareReceipt(Receipt receipt)
     {
         var text = $"Receipt: {receipt.BusinessName} - {receipt.Amount:C} on {receipt.ReceiptDate:MM/dd/yyyy}";
+
+        if (!string.IsNullOrWhiteSpace(receipt.PhotoUrl))
+        {
+            try
+            {
+                var photoBytes = await HttpClient.GetByteArrayAsync(receipt.PhotoUrl);
+                var fileName = $"{receipt.BusinessName.Replace(" ", "_")}_{receipt.ReceiptDate:yyyyMMdd}.jpg";
+                await ShareService.ShareWithFileAsync("Receipt", text, photoBytes, fileName, "image/jpeg");
+                return;
+            }
+            catch
+            {
+                // Fall back to text-only share if photo fetch fails
+            }
+        }
+
         await ShareService.ShareTextAsync("Receipt", text);
     }
 

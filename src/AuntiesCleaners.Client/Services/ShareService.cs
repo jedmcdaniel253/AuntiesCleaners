@@ -27,4 +27,9 @@ public class ShareService : IShareService
     {
         await _jsRuntime.InvokeVoidAsync("shareInterop.shareText", title, text);
     }
+
+    public async Task ShareWithFileAsync(string title, string text, byte[] fileBytes, string fileName, string mimeType)
+    {
+        await _jsRuntime.InvokeVoidAsync("shareInterop.shareWithFile", title, text, fileBytes, fileName, mimeType);
+    }
 }
