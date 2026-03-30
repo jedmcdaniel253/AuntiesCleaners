@@ -1,5 +1,5 @@
 self.assetsManifest = {
-  "version": "tnLC2Mi7",
+  "version": "W4/jI6NK",
   "assets": [
     {
       "hash": "sha256-GOICr9yHA36MEPnZ8vharGMB011I3XMCR0K56HEw6WI=",
@@ -18,8 +18,8 @@ self.assetsManifest = {
       "url": "_content/MudBlazor/MudBlazor.min.js.map"
     },
     {
-      "hash": "sha256-fggqxQzCEyUpp3njkq78pQ5mMxqnc5wyuqtIUtyKE+M=",
-      "url": "_framework/AuntiesCleaners.Client.yb1jn5x3qp.wasm"
+      "hash": "sha256-XqXCC73HOhYRoimR9PyRP+lVgTPll5Z5WGx+X7z296g=",
+      "url": "_framework/AuntiesCleaners.Client.ah33xopjkq.wasm"
     },
     {
       "hash": "sha256-XePOw4Z+OeufSwFCiMWnMVrbvM9QiA5GcdKbUBOv8xk=",
@@ -394,7 +394,7 @@ self.assetsManifest = {
       "url": "_framework/Websocket.Client.sntjl98ana.wasm"
     },
     {
-      "hash": "sha256-vctawqTx80gUPCvPE8q8tEcNgIgH4ytgrolLenAodIU=",
+      "hash": "sha256-FYYSA4caWC7LdQ3mGNMUdQ1G8F4VcjVxPCqOKO75HkQ=",
       "url": "_framework/blazor.boot.json"
     },
     {
