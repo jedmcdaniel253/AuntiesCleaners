@@ -10,6 +10,7 @@ builder.RootComponents.Add<HeadOutlet>("head::after");
 
 builder.Services.AddMudServices();
 builder.Services.AddSingleton<ISupabaseClientService, SupabaseClientService>();
+builder.Services.AddSingleton<IAppVersionService, AppVersionService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ITabConfigService, TabConfigService>();
 builder.Services.AddScoped<IWorkerService, WorkerService>();
