@@ -21,6 +21,13 @@ public class AppVersionService : IAppVersionService
         Version = ResolveVersion(rawVersion);
     }
 
-    private static string ResolveVersion(string? rawVersion) =>
-        string.IsNullOrWhiteSpace(rawVersion) ? "dev" : rawVersion;
+    private static string ResolveVersion(string? rawVersion)
+    {
+        if (string.IsNullOrWhiteSpace(rawVersion))
+            return "dev";
+
+        // Strip the "+commithash" suffix appended by the .NET SDK
+        var plusIndex = rawVersion.IndexOf('+');
+        return plusIndex > 0 ? rawVersion[..plusIndex] : rawVersion;
+    }
 }

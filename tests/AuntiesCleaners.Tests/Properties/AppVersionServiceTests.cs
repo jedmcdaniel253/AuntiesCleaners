@@ -22,7 +22,7 @@ internal class TestableAppVersionService : AppVersionService
 public class AppVersionServiceTests
 {
     private static readonly char[] PrintableChars =
-        "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-+_/".ToCharArray();
+        "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-_/".ToCharArray();
 
     private static readonly char[] WhitespaceChars = { ' ', '\t', '\n', '\r' };
 
@@ -41,7 +41,7 @@ public class AppVersionServiceTests
 
     /// <summary>
     /// Feature: app-version-display, Property 2: Service reads assembly informational version.
-    /// For any non-whitespace string, AppVersionService.Version returns that exact string.
+    /// For any non-whitespace string without '+' metadata, AppVersionService.Version returns that exact string.
     /// **Validates: Requirements 1.3, 2.2**
     /// </summary>
     [Property(MaxTest = 100)]
