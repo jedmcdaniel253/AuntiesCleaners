@@ -1,5 +1,8 @@
 window.pdfInterop = {
     generateBillingReportPdf: function (report) {
+        if (!window.jspdf || !window.jspdf.jsPDF) {
+            throw new Error('jsPDF library not loaded. Check your internet connection and try again.');
+        }
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF();
         let y = 20;

@@ -11,9 +11,29 @@ window.shareInterop = {
         try {
             await navigator.share({ title, text });
         } catch (e) {
-            // User cancelled or share failed — not an error we need to surface
             if (e.name !== 'AbortError') {
                 console.error('Share failed:', e);
+            }
+        }
+    },
+
+    async shareWithFile(title, text, fileBytes, fileName, mimeType) {
+        if (!navigator.canShare) {
+            // Fall back to text-only share
+            return await this.shareText(title, text);
+        }
+        try {
+            const file = new File([new Uint8Array(fileBytes)], fileName, { type: mimeType });
+            const shareData = { title, text, files: [file] };
+            if (navigator.canShare(shareData)) {
+                await navigator.share(shareData);
+            } else {
+                // Browser can't share files, fall back to text
+                await this.shareText(title, text);
+            }
+        } catch (e) {
+            if (e.name !== 'AbortError') {
+                console.error('Share with file failed:', e);
             }
         }
     }
