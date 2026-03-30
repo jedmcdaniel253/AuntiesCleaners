@@ -1,18 +1,54 @@
 using AuntiesCleaners.Client.Models;
+using Microsoft.JSInterop;
 
 namespace AuntiesCleaners.Client.Services;
 
 public class AuthService : IAuthService
 {
     private readonly ISupabaseClientService _supabase;
+    private readonly IJSRuntime _js;
     private UserProfile? _cachedProfile;
+    private const string SessionKey = "supabase.auth.session";
 
     public bool IsAuthenticated => _supabase.Client.Auth.CurrentUser != null;
     public event Action? OnAuthStateChanged;
 
-    public AuthService(ISupabaseClientService supabase)
+    public AuthService(ISupabaseClientService supabase, IJSRuntime js)
     {
         _supabase = supabase;
+        _js = js;
+    }
+
+    public async Task InitializeAsync()
+    {
+        await _supabase.InitializeAsync();
+
+        // If no current user after init, try restoring session from localStorage
+        if (_supabase.Client.Auth.CurrentUser == null)
+        {
+            try
+            {
+                var refreshToken = await _js.InvokeAsync<string?>("sessionInterop.load", SessionKey);
+                if (!string.IsNullOrEmpty(refreshToken))
+                {
+                    // Use SignIn with refresh token to restore the session
+                    var session = await _supabase.Client.Auth.SignIn(Supabase.Gotrue.Constants.SignInType.RefreshToken, refreshToken);
+                    if (session?.User != null)
+                    {
+                        // Save the new refresh token
+                        await _js.InvokeVoidAsync("sessionInterop.save", SessionKey, session.RefreshToken);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[AuthService] Session restore failed: {ex.Message}");
+                // Clear invalid session data
+                await _js.InvokeVoidAsync("sessionInterop.destroy", SessionKey);
+            }
+        }
+
+        OnAuthStateChanged?.Invoke();
     }
 
     public async Task<bool> LoginAsync(string email, string password)
@@ -23,6 +59,11 @@ public class AuthService : IAuthService
             if (session?.User != null)
             {
                 _cachedProfile = null;
+                // Persist refresh token to localStorage
+                if (!string.IsNullOrEmpty(session.RefreshToken))
+                {
+                    await _js.InvokeVoidAsync("sessionInterop.save", SessionKey, session.RefreshToken);
+                }
                 OnAuthStateChanged?.Invoke();
                 return true;
             }
@@ -38,6 +79,7 @@ public class AuthService : IAuthService
     {
         await _supabase.Client.Auth.SignOut();
         _cachedProfile = null;
+        await _js.InvokeVoidAsync("sessionInterop.destroy", SessionKey);
         OnAuthStateChanged?.Invoke();
     }
 

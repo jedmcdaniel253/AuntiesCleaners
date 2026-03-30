@@ -3,18 +3,30 @@
 @inject IOcrService OcrService
 @inject IReceiptService ReceiptService
 @inject ISnackbar Snackbar
+@inject IJSRuntime JS
 
 <MudForm @ref="_form">
     <MudStack Spacing="3">
-        <MudFileUpload T="IBrowserFile" Accept="image/*" FilesChanged="OnFileSelected"
-                       MaximumFileCount="1">
-            <ActivatorContent>
-                <MudButton Variant="Variant.Outlined" Color="Color.Primary"
-                           StartIcon="@Icons.Material.Filled.CameraAlt" FullWidth="true">
-                    Capture Receipt Photo
-                </MudButton>
-            </ActivatorContent>
-        </MudFileUpload>
+        <input type="file" accept="image/*" capture="environment" @ref="_cameraInput" @onchange="OnCameraFileChanged" style="display:none" />
+
+        <MudStack Row="true" Spacing="2">
+            <MudFileUpload T="IBrowserFile" Accept="image/*" FilesChanged="OnFileSelected"
+                           MaximumFileCount="1">
+                <ActivatorContent>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.CameraAlt" FullWidth="true">
+                        Capture Receipt Photo
+                    </MudButton>
+                </ActivatorContent>
+            </MudFileUpload>
+
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.PhotoCamera"
+                       aria-label="Take Photo"
+                       OnClick="TriggerCameraCapture">
+                Take Photo
+            </MudButton>
+        </MudStack>
 
         @if (_isProcessingOcr)
         {
@@ -62,11 +74,60 @@
     private bool _isProcessingOcr;
     private byte[]? _photoBytes;
     private string _photoFileName = string.Empty;
+    private ElementReference _cameraInput;
+
+    private async Task TriggerCameraCapture()
+    {
+        await JS.InvokeVoidAsync("cameraInterop.clickElement", _cameraInput);
+    }
+
+    private async Task OnCameraFileChanged()
+    {
+        var bytes = await JS.InvokeAsync<byte[]>("cameraInterop.readFileAsBytes", _cameraInput);
+        var fileName = await JS.InvokeAsync<string>("cameraInterop.getFileName", _cameraInput);
+
+        if (bytes is null || bytes.Length == 0)
+            return;
+
+        if (bytes.Length > 10 * 1024 * 1024)
+        {
+            Snackbar.Add("File exceeds 10 MB limit.", Severity.Warning);
+            return;
+        }
+
+        _photoBytes = bytes;
+        _photoFileName = fileName;
+
+        _isProcessingOcr = true;
+        StateHasChanged();
+
+        try
+        {
+            var result = await OcrService.ExtractTextAsync(_photoBytes);
+            if (!string.IsNullOrWhiteSpace(result.BusinessName))
+                _businessName = result.BusinessName;
+            if (result.Amount > 0)
+                _amount = result.Amount;
+        }
+        catch
+        {
+            Snackbar.Add("OCR extraction failed. Please enter details manually.", Severity.Warning);
+        }
+        finally
+        {
+            _isProcessingOcr = false;
+            StateHasChanged();
+        }
+    }
 
     private async Task OnFileSelected(IBrowserFile file)
     {
         if (file is null) return;
+        await ProcessFileAsync(file);
+    }
 
+    private async Task ProcessFileAsync(IBrowserFile file)
+    {
         _isProcessingOcr = true;
         StateHasChanged();
 

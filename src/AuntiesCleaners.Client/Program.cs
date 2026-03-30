@@ -27,6 +27,7 @@ builder.Services.AddScoped<IPdfService, PdfService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IOwnerService, OwnerService>();
 builder.Services.AddScoped<IWorkerPayService, WorkerPayService>();
+builder.Services.AddScoped<IProfitReportService, ProfitReportService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddSingleton<TabConfigNotifier>();
 builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(builder.HostEnvironment.BaseAddress) });

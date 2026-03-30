@@ -18,7 +18,7 @@ public static class RoleFeatureMap
     public static readonly HashSet<string> BossFeatures = new(ManagerFeatures)
     {
         "Rates", "MiscEntriesCRUD", "BillingReports", "WorkerPay", "OwnerContact",
-        "Workers", "Houses", "Users", "TabConfig"
+        "Workers", "Houses", "Users", "TabConfig", "BossProfitReport"
     };
 
     public static readonly HashSet<string> AdminFeatures = new(BossFeatures);

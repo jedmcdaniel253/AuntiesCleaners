@@ -9,7 +9,11 @@
 <MudDialogProvider />
 <MudSnackbarProvider />
 
-@if (!AuthService.IsAuthenticated)
+@if (!_initialized)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (!AuthService.IsAuthenticated)
 {
     @Body
 }
@@ -46,9 +50,13 @@ else
         }
     };
 
-    protected override void OnInitialized()
+    private bool _initialized;
+
+    protected override async Task OnInitializedAsync()
     {
         AuthService.OnAuthStateChanged += StateHasChanged;
+        await AuthService.InitializeAsync();
+        _initialized = true;
     }
 
     private async Task HandleLogout()

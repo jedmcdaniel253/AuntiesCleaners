@@ -23,6 +23,7 @@ public static class AllTabs
     public static readonly TabDefinition OwnerContact = new("Owner", "owner-contact", Icons.Material.Filled.ContactPhone);
     public static readonly TabDefinition Users = new("Users", "users", Icons.Material.Filled.ManageAccounts);
     public static readonly TabDefinition TabConfig = new("Tab Config", "tab-config", Icons.Material.Filled.Tab);
+    public static readonly TabDefinition BossProfit = new("Boss Profit", "boss-profit", Icons.Material.Filled.TrendingUp);
 
     public static readonly Dictionary<string, TabDefinition> ByName = new()
     {
@@ -31,6 +32,6 @@ public static class AllTabs
         ["Mow List"] = MowList, ["My Entries"] = MyEntries, ["Daily Summary"] = DailySummary,
         ["Workers"] = Workers, ["Houses"] = Houses, ["Rates"] = Rates,
         ["Billing"] = BillingReports, ["Worker Pay"] = WorkerPay, ["Owner"] = OwnerContact,
-        ["Users"] = Users, ["Tab Config"] = TabConfig
+        ["Users"] = Users, ["Tab Config"] = TabConfig, ["Boss Profit"] = BossProfit
     };
 }

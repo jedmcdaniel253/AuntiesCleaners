@@ -69,22 +69,28 @@ public class BillingReportService : IBillingReportService
         var defaultRate = rates.FirstOrDefault(r => r.WorkerId == null);
         var section = new BillingSection { Name = sectionName };
 
-        foreach (var entry in entries)
+        var grouped = entries
+            .GroupBy(e => new { e.HouseId, e.EntryDate.Date })
+            .OrderBy(g => g.Key.Date)
+            .ThenBy(g => houseMap.GetValueOrDefault(g.Key.HouseId, "Unknown"));
+
+        foreach (var group in grouped)
         {
-            var hours = entry.HoursBilled ?? 0;
+            var totalHours = group.Sum(e => e.HoursBilled ?? 0);
             var rateCharged = defaultRate?.RateCharged ?? 0;
-            var houseName = houseMap.GetValueOrDefault(entry.HouseId, "Unknown");
-            var amount = hours * rateCharged;
+            var houseName = houseMap.GetValueOrDefault(group.Key.HouseId, "Unknown");
+            var amount = totalHours * rateCharged;
 
             section.LineItems.Add(new BillingLineItem
             {
-                Description = $"{houseName} — {entry.EntryDate:MM/dd/yyyy} — {hours:F1} hrs @ ${rateCharged:F2}/hr",
+                Description = $"{group.Key.Date:MM/dd/yyyy} — {houseName} — {totalHours:F1} hrs",
                 Amount = amount
             });
         }
 
         return section;
     }
+
 
     private static BillingSection BuildLaundrySection(
         List<WorkEntry> allEntries, List<Rate> rates,
@@ -126,7 +132,7 @@ public class BillingReportService : IBillingReportService
 
             section.LineItems.Add(new BillingLineItem
             {
-                Description = $"{houseName} — {entry.EntryDate:MM/dd/yyyy} — Flat rate ${rateCharged:F2}",
+                Description = $"{entry.EntryDate:MM/dd/yyyy} — {houseName}",
                 Amount = rateCharged
             });
         }
