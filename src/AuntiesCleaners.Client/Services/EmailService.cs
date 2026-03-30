@@ -28,7 +28,7 @@ public class EmailService : IEmailService
             allAttachments.Add(new { filename = name, content = Convert.ToBase64String(data) });
         }
 
-        var body = $"<h1>Auntie's Cleaners — Billing Report</h1><p>Please find the billing report attached.</p>";
+        var body = $"<h1>Auntie's Cleaners — Billing Report</h1><p>{subject}</p><p>Please find the billing report attached.</p>";
 
         var payload = new
         {
