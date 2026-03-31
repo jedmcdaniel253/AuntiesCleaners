@@ -101,6 +101,10 @@
             _report = await BillingReportService.GenerateReportAsync(_fromDate.Value, _toDate.Value);
             _receipts = await ReceiptService.GetByDateRangeAsync(_fromDate.Value, _toDate.Value);
         }
+        catch (InvalidOperationException)
+        {
+            Snackbar.Add("No billing owner is set. Please designate a billing owner on the Owner page.", Severity.Warning);
+        }
         catch (Exception ex)
         {
             Snackbar.Add($"Error generating report: {ex.Message}", Severity.Error);
@@ -131,8 +135,13 @@
         _sending = true;
         try
         {
-            var owner = await OwnerService.GetOwnerAsync();
-            if (owner == null || string.IsNullOrWhiteSpace(owner.Email))
+            var owner = await OwnerService.GetBillingOwnerAsync();
+            if (owner == null)
+            {
+                Snackbar.Add("No billing owner is set. Please designate a billing owner on the Owner page.", Severity.Warning);
+                return;
+            }
+            if (string.IsNullOrWhiteSpace(owner.Email))
             {
                 Snackbar.Add("Owner email not configured. Please set up Owner contact first.", Severity.Warning);
                 return;

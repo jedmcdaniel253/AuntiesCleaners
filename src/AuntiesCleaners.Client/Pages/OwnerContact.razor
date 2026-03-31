@@ -4,6 +4,8 @@
 @using AuntiesCleaners.Client.Shared
 @using System.ComponentModel.DataAnnotations
 @inject IOwnerService OwnerService
+@inject IHouseService HouseService
+@inject IDialogService DialogService
 @inject ISnackbar Snackbar
 
 <RoleGuard AllowedRoles="@(new[] { Role.Boss, Role.Admin })">
@@ -13,53 +15,80 @@
     {
         <MudProgressCircular Indeterminate="true" />
     }
-    else if (_owner == null)
-    {
-        <MudAlert Severity="Severity.Warning">No owner record found.</MudAlert>
-    }
-    else if (!_editing)
-    {
-        <MudCard Class="mb-4">
-            <MudCardContent>
-                <MudText Typo="Typo.h6" Class="mb-2">@_owner.Name</MudText>
-                <MudStack Spacing="1">
-                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
-                        <MudIcon Icon="@Icons.Material.Filled.Email" Size="Size.Small" />
-                        <MudLink Href="@($"mailto:{_owner.Email}")">@_owner.Email</MudLink>
-                    </MudStack>
-                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
-                        <MudIcon Icon="@Icons.Material.Filled.Phone" Size="Size.Small" />
-                        <MudLink Href="@($"sms:{_owner.Phone}")">@_owner.Phone</MudLink>
-                    </MudStack>
-                </MudStack>
-            </MudCardContent>
-            <MudCardActions>
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="StartEditing">Edit</MudButton>
-            </MudCardActions>
-        </MudCard>
-    }
     else
     {
-        <MudPaper Class="pa-4 mb-4" Elevation="2">
-            <MudText Typo="Typo.h6" Class="mb-2">Edit Owner Contact</MudText>
-            <MudTextField @bind-Value="_formName" Label="Name" Required="true" RequiredError="Name is required."
-                          Variant="Variant.Outlined" Class="mb-2" />
-            <MudTextField @bind-Value="_formEmail" Label="Email" Required="true" RequiredError="Email is required."
-                          InputType="InputType.Email" Variant="Variant.Outlined" Class="mb-2" />
-            <MudTextField @bind-Value="_formPhone" Label="Phone" Required="true" RequiredError="Phone is required."
-                          InputType="InputType.Telephone" Variant="Variant.Outlined" Class="mb-2" />
-            <MudStack Row="true" Spacing="2">
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveOwner">Save</MudButton>
-                <MudButton Variant="Variant.Text" OnClick="CancelEditing">Cancel</MudButton>
-            </MudStack>
-        </MudPaper>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mb-4"
+                   OnClick="StartAdding">Add Owner</MudButton>
+
+        @if (_showForm)
+        {
+            <MudPaper Class="pa-4 mb-4" Elevation="2">
+                <MudText Typo="Typo.h6" Class="mb-2">@(_editingOwnerId.HasValue ? "Edit Owner" : "Add Owner")</MudText>
+                <MudTextField @bind-Value="_formName" Label="Name" Required="true"
+                              RequiredError="Name is required."
+                              Variant="Variant.Outlined" Class="mb-2" />
+                <MudTextField @bind-Value="_formEmail" Label="Email" Required="true"
+                              RequiredError="Email is required."
+                              InputType="InputType.Email" Variant="Variant.Outlined" Class="mb-2" />
+                <MudTextField @bind-Value="_formPhone" Label="Phone" Required="true"
+                              RequiredError="Phone is required."
+                              InputType="InputType.Telephone" Variant="Variant.Outlined" Class="mb-2" />
+                <MudStack Row="true" Spacing="2">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveOwner">Save</MudButton>
+                    <MudButton Variant="Variant.Text" OnClick="CancelForm">Cancel</MudButton>
+                </MudStack>
+            </MudPaper>
+        }
+
+        @if (!_owners.Any())
+        {
+            <MudAlert Severity="Severity.Info">No owners have been added.</MudAlert>
+        }
+        else
+        {
+            <MudTable Items="_owners" Hover="true" Dense="true" Striped="true">
+                <HeaderContent>
+                    <MudTh>Name</MudTh>
+                    <MudTh>Email</MudTh>
+                    <MudTh>Phone</MudTh>
+                    <MudTh>Billing Owner</MudTh>
+                    <MudTh>Actions</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Name">@context.Name</MudTd>
+                    <MudTd DataLabel="Email">@context.Email</MudTd>
+                    <MudTd DataLabel="Phone">@context.Phone</MudTd>
+                    <MudTd DataLabel="Billing Owner">
+                        @if (context.IsBillingOwner)
+                        {
+                            <MudChip T="string" Color="Color.Success" Size="Size.Small">Billing</MudChip>
+                        }
+                    </MudTd>
+                    <MudTd>
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
+                                       OnClick="@(() => StartEditing(context))" aria-label="Edit owner" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
+                                       Color="Color.Error"
+                                       OnClick="@(() => ConfirmDelete(context))" aria-label="Delete owner" />
+                        @if (!context.IsBillingOwner)
+                        {
+                            <MudIconButton Icon="@Icons.Material.Filled.Star" Size="Size.Small"
+                                           Color="Color.Warning"
+                                           OnClick="@(() => SetBillingOwner(context))"
+                                           aria-label="Set as billing owner" />
+                        }
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
     }
 </RoleGuard>
 
 @code {
-    private Owner? _owner;
+    private List<Owner> _owners = new();
     private bool _loading = true;
-    private bool _editing;
+    private bool _showForm;
+    private Guid? _editingOwnerId;
 
     private string _formName = string.Empty;
     private string _formEmail = string.Empty;
@@ -67,28 +96,38 @@
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadOwner();
+        await LoadOwners();
     }
 
-    private async Task LoadOwner()
+    private async Task LoadOwners()
     {
         _loading = true;
-        _owner = await OwnerService.GetOwnerAsync();
+        _owners = await OwnerService.GetAllAsync();
         _loading = false;
     }
 
-    private void StartEditing()
+    private void StartAdding()
     {
-        if (_owner == null) return;
-        _formName = _owner.Name;
-        _formEmail = _owner.Email;
-        _formPhone = _owner.Phone;
-        _editing = true;
+        _editingOwnerId = null;
+        _formName = string.Empty;
+        _formEmail = string.Empty;
+        _formPhone = string.Empty;
+        _showForm = true;
     }
 
-    private void CancelEditing()
+    private void StartEditing(Owner owner)
     {
-        _editing = false;
+        _editingOwnerId = owner.Id;
+        _formName = owner.Name;
+        _formEmail = owner.Email;
+        _formPhone = owner.Phone;
+        _showForm = true;
+    }
+
+    private void CancelForm()
+    {
+        _showForm = false;
+        _editingOwnerId = null;
     }
 
     private async Task SaveOwner()
@@ -117,19 +156,88 @@
             return;
         }
 
-        _owner!.Name = _formName.Trim();
-        _owner.Email = _formEmail.Trim();
-        _owner.Phone = _formPhone.Trim();
-
         try
         {
-            _owner = await OwnerService.UpdateAsync(_owner);
-            Snackbar.Add("Owner contact updated.", Severity.Success);
-            _editing = false;
+            if (_editingOwnerId.HasValue)
+            {
+                var owner = _owners.First(o => o.Id == _editingOwnerId.Value);
+                owner.Name = _formName.Trim();
+                owner.Email = _formEmail.Trim();
+                owner.Phone = _formPhone.Trim();
+                await OwnerService.UpdateAsync(owner);
+                Snackbar.Add("Owner updated.", Severity.Success);
+            }
+            else
+            {
+                var owner = new Owner
+                {
+                    Name = _formName.Trim(),
+                    Email = _formEmail.Trim(),
+                    Phone = _formPhone.Trim()
+                };
+                await OwnerService.CreateAsync(owner);
+                Snackbar.Add("Owner created.", Severity.Success);
+            }
+
+            _showForm = false;
+            _editingOwnerId = null;
+            await LoadOwners();
         }
         catch (Exception ex)
         {
             Snackbar.Add($"Error saving: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task ConfirmDelete(Owner owner)
+    {
+        // Check if owner is assigned to any houses
+        var allHouses = await HouseService.GetAllAsync();
+        var assignedHouses = allHouses.Where(h => h.OwnerId == owner.Id).ToList();
+
+        if (assignedHouses.Any())
+        {
+            var houseNames = string.Join(", ", assignedHouses.Select(h => h.Name));
+            Snackbar.Add($"Cannot delete {owner.Name}. Assigned to houses: {houseNames}", Severity.Error);
+            return;
+        }
+
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { x => x.ContentText, $"Are you sure you want to delete {owner.Name}?" },
+            { x => x.ButtonText, "Delete" },
+            { x => x.Color, Color.Error }
+        };
+
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Delete Owner", parameters);
+        var result = await dialog.Result;
+
+        if (result is not null && !result.Canceled)
+        {
+            try
+            {
+                await OwnerService.DeleteAsync(owner.Id);
+                await LoadOwners();
+                Snackbar.Add("Owner deleted.", Severity.Success);
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Error deleting: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task SetBillingOwner(Owner owner)
+    {
+        try
+        {
+            await OwnerService.SetBillingOwnerAsync(owner.Id);
+            await LoadOwners();
+            Snackbar.Add($"{owner.Name} set as billing owner.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error setting billing owner: {ex.Message}", Severity.Error);
         }
     }
 }

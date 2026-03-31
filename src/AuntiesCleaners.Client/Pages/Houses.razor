@@ -3,6 +3,7 @@
 @using AuntiesCleaners.Client.Services
 @using AuntiesCleaners.Client.Shared
 @inject IHouseService HouseService
+@inject IOwnerService OwnerService
 @inject ISnackbar Snackbar
 
 <RoleGuard AllowedRoles="@(new[] { Role.Boss, Role.Admin })">
@@ -17,6 +18,12 @@
         <MudPaper Class="pa-4 mb-4" Elevation="2">
             <MudText Typo="Typo.h6" Class="mb-2">@(_editingHouse?.Id != Guid.Empty ? "Edit" : "Add") House</MudText>
             <MudTextField @bind-Value="_formName" Label="Name / Address" Variant="Variant.Outlined" Class="mb-2" />
+            <MudSelect T="Guid?" @bind-Value="_formOwnerId" Label="Owner" Variant="Variant.Outlined" Class="mb-2" Clearable="true">
+                @foreach (var owner in _owners)
+                {
+                    <MudSelectItem T="Guid?" Value="@owner.Id">@owner.Name</MudSelectItem>
+                }
+            </MudSelect>
             <MudStack Row="true" Spacing="2">
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveHouse">Save</MudButton>
                 <MudButton Variant="Variant.Text" OnClick="@(() => _showForm = false)">Cancel</MudButton>
@@ -27,6 +34,7 @@
     <MudTable Items="_houses" Hover="true" Dense="true">
         <HeaderContent>
             <MudTh>Name</MudTh>
+            <MudTh>Owner</MudTh>
             <MudTh>Status</MudTh>
             <MudTh>Actions</MudTh>
         </HeaderContent>
@@ -38,6 +46,7 @@
                     <MudChip T="string" Size="Size.Small" Color="Color.Info" Class="ml-2">System</MudChip>
                 }
             </MudTd>
+            <MudTd>@GetOwnerName(context.OwnerId)</MudTd>
             <MudTd>
                 <MudChip T="string" Color="@(context.IsActive ? Color.Success : Color.Default)" Size="Size.Small">
                     @(context.IsActive ? "Active" : "Inactive")
@@ -60,11 +69,17 @@
 
 @code {
     private List<House> _houses = new();
+    private List<Owner> _owners = new();
     private bool _showForm;
     private House? _editingHouse;
     private string _formName = string.Empty;
+    private Guid? _formOwnerId;
 
-    protected override async Task OnInitializedAsync() => await LoadHouses();
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadHouses();
+        _owners = await OwnerService.GetAllAsync();
+    }
 
     private async Task LoadHouses()
     {
@@ -75,6 +90,7 @@
     {
         _editingHouse = new House();
         _formName = string.Empty;
+        _formOwnerId = null;
         _showForm = true;
     }
 
@@ -82,6 +98,7 @@
     {
         _editingHouse = house;
         _formName = house.Name;
+        _formOwnerId = house.OwnerId;
         _showForm = true;
     }
 
@@ -93,15 +110,16 @@
             return;
         }
 
-        if (_editingHouse!.Id == Guid.Empty)
+        _editingHouse!.Name = _formName;
+        _editingHouse.OwnerId = _formOwnerId;
+
+        if (_editingHouse.Id == Guid.Empty)
         {
-            _editingHouse.Name = _formName;
             await HouseService.CreateAsync(_editingHouse);
             Snackbar.Add("House added.", Severity.Success);
         }
         else
         {
-            _editingHouse.Name = _formName;
             await HouseService.UpdateAsync(_editingHouse);
             Snackbar.Add("House updated.", Severity.Success);
         }
@@ -116,4 +134,7 @@
         Snackbar.Add($"{house.Name} deactivated.", Severity.Info);
         await LoadHouses();
     }
+
+    private string GetOwnerName(Guid? ownerId) =>
+        _owners.FirstOrDefault(o => o.Id == ownerId)?.Name ?? "";
 }

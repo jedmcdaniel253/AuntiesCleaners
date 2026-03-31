@@ -10,5 +10,6 @@ public class Owner : BaseModel
     [Column("name")] public string Name { get; set; } = string.Empty;
     [Column("email")] public string Email { get; set; } = string.Empty;
     [Column("phone")] public string Phone { get; set; } = string.Empty;
+    [Column("is_billing_owner")] public bool IsBillingOwner { get; set; }
     [Column("updated_at")] public DateTime UpdatedAt { get; set; }
 }

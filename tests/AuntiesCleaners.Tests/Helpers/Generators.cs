@@ -319,6 +319,67 @@ public static class Generators
             UpdatedAt = updatedAt
         };
 
+    // ── Owner ───────────────────────────────────────────────────────
+
+    public static Gen<string> EmailWordGen =>
+        Gen.Elements("alice", "bob", "charlie", "diana", "eve", "frank",
+            "grace", "hank", "ivy", "jack", "karen", "leo");
+
+    public static Gen<Owner> OwnerGen =>
+        from id in GuidGen
+        from name in NonEmptyNameGen
+        from emailUser in EmailWordGen
+        from emailDomain in EmailWordGen
+        from phone in Gen.Elements("555-0100", "555-0200", "555-0300", "555-0400")
+        from isBilling in Gen.Elements(true, false)
+        from updatedAt in ReasonableDateGen
+        select new Owner
+        {
+            Id = id,
+            Name = name,
+            Email = $"{emailUser}@{emailDomain}.com",
+            Phone = phone,
+            IsBillingOwner = isBilling,
+            UpdatedAt = updatedAt
+        };
+
+    /// <summary>
+    /// Generates a list of owners where at most one has IsBillingOwner = true.
+    /// </summary>
+    public static Gen<List<Owner>> OwnerListWithBillingInvariantGen =>
+        from owners in OwnerGen.Select(o => { o.IsBillingOwner = false; return o; })
+                               .ListOf()
+                               .Select(l => l.ToList())
+        from billingIndex in owners.Count > 0
+            ? Gen.Choose(0, owners.Count) // Count means "no billing owner" when index == Count
+            : Gen.Constant(0)
+        select SetBillingOwner(owners, billingIndex);
+
+    /// <summary>
+    /// Generates houses with OwnerId randomly picked from a generated owner list or null.
+    /// </summary>
+    public static Gen<(List<Owner> Owners, List<House> Houses)> HouseWithOwnerGen =>
+        from owners in OwnerListWithBillingInvariantGen.Where(l => l.Count > 0)
+        from houseCount in Gen.Choose(1, 10)
+        from houses in Gen.ListOf(HouseGen, houseCount)
+        from ownerIndices in Gen.ListOf(Gen.Choose(-1, owners.Count - 1), houseCount)
+        select ApplyOwnerIndices(owners, houses.ToList(), ownerIndices.ToList());
+
+    private static List<Owner> SetBillingOwner(List<Owner> owners, int billingIndex)
+    {
+        for (int i = 0; i < owners.Count; i++)
+            owners[i].IsBillingOwner = i == billingIndex;
+        return owners;
+    }
+
+    private static (List<Owner> Owners, List<House> Houses) ApplyOwnerIndices(
+        List<Owner> owners, List<House> houses, List<int> ownerIndices)
+    {
+        for (int i = 0; i < houses.Count; i++)
+            houses[i].OwnerId = ownerIndices[i] < 0 ? null : owners[ownerIndices[i]].Id;
+        return (owners, houses);
+    }
+
     // ── TurnoverEvent ───────────────────────────────────────────────
 
     public static Gen<TurnoverEvent> TurnoverEventGen =>

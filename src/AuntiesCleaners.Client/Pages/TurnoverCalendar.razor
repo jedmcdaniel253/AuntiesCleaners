@@ -24,8 +24,17 @@
     <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="GoToCurrentWeek">Today</MudButton>
 </MudStack>
 
+@* Owner filter *@
+<MudSelect T="Owner?" @bind-Value="_selectedOwnerFilter" Label="Owner Filter" Variant="Variant.Outlined"
+           Class="mb-4" Style="max-width:300px;" Clearable="true" Placeholder="All Owners">
+    @foreach (var owner in _owners)
+    {
+        <MudSelectItem T="Owner?" Value="@owner">@owner.Name</MudSelectItem>
+    }
+</MudSelect>
+
 @* Weekly grid: rows = houses, columns = days *@
-<MudTable Items="@_houses" Hover="true" Dense="true" Breakpoint="Breakpoint.None">
+<MudTable Items="@FilteredHouses" Hover="true" Dense="true" Breakpoint="Breakpoint.None">
     <HeaderContent>
         <MudTh>House</MudTh>
         @for (int i = 0; i < 7; i++)
@@ -123,6 +132,17 @@
     private DateTime _weekStart;
     private List<House> _houses = new();
     private List<TurnoverEvent> _weekEvents = new();
+    private List<Owner> _owners = new();
+    private Owner? _selectedOwnerFilter;
+
+    // Filtered views based on owner filter
+    private List<House> FilteredHouses => _selectedOwnerFilter == null
+        ? _houses
+        : _houses.Where(h => h.OwnerId == _selectedOwnerFilter.Id).ToList();
+
+    private List<TurnoverEvent> FilteredWeekEvents => _selectedOwnerFilter == null
+        ? _weekEvents
+        : _weekEvents.Where(e => FilteredHouses.Any(h => h.Id == e.HouseId)).ToList();
 
     // Day drill-down state
     private bool _showDayDrillDown;
@@ -136,6 +156,7 @@
     protected override async Task OnInitializedAsync()
     {
         _weekStart = GetMondayOfWeek(DateTime.Today);
+        _owners = await OwnerService.GetAllAsync();
         await LoadData();
     }
 
@@ -173,7 +194,7 @@
     }
 
     private List<TurnoverEvent> GetEventsForHouseAndDay(Guid houseId, DateTime day) =>
-        _weekEvents.Where(e => e.HouseId == houseId && e.EventDate.Date == day.Date).ToList();
+        FilteredWeekEvents.Where(e => e.HouseId == houseId && e.EventDate.Date == day.Date).ToList();
 
     private static Color GetEventColor(TurnoverEvent evt) =>
         evt.IsFlip ? Color.Warning : evt.IsCheckout ? Color.Error : Color.Success;
@@ -186,7 +207,7 @@
     {
         _selectedDay = day;
         _selectedHouseId = houseId;
-        _dayEvents = _weekEvents.Where(e => e.EventDate.Date == day.Date).ToList();
+        _dayEvents = FilteredWeekEvents.Where(e => e.EventDate.Date == day.Date).ToList();
         _showDayDrillDown = true;
     }
 
@@ -269,6 +290,13 @@
     // Share
     private async Task ShareDaySchedule()
     {
+        // If an owner filter is active and there are no day events, show snackbar
+        if (_selectedOwnerFilter != null && !_dayEvents.Any())
+        {
+            Snackbar.Add($"No entries to share for {_selectedOwnerFilter.Name}.", Severity.Info);
+            return;
+        }
+
         var canShare = await ShareService.CanShareAsync();
         if (!canShare)
         {

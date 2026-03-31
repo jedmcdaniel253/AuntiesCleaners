@@ -9,28 +9,45 @@ public class BillingReportService : IBillingReportService
     private readonly IReceiptService _receiptService;
     private readonly IRateService _rateService;
     private readonly IHouseService _houseService;
+    private readonly IOwnerService _ownerService;
 
     public BillingReportService(
         IWorkEntryService workEntryService,
         IMiscEntryService miscEntryService,
         IReceiptService receiptService,
         IRateService rateService,
-        IHouseService houseService)
+        IHouseService houseService,
+        IOwnerService ownerService)
     {
         _workEntryService = workEntryService;
         _miscEntryService = miscEntryService;
         _receiptService = receiptService;
         _rateService = rateService;
         _houseService = houseService;
+        _ownerService = ownerService;
     }
 
     public async Task<BillingReport> GenerateReportAsync(DateTime from, DateTime to)
     {
+        var billingOwner = await _ownerService.GetBillingOwnerAsync();
+        if (billingOwner == null)
+            throw new InvalidOperationException("No billing owner is set.");
+
         var workEntries = await _workEntryService.GetByDateRangeAsync(from, to);
         var miscEntries = await _miscEntryService.GetByDateRangeAsync(from, to);
         var receipts = await _receiptService.GetByDateRangeAsync(from, to);
         var houses = await _houseService.GetAllAsync();
+
+        // Filter houses to only those belonging to the billing owner
+        houses = houses.Where(h => h.OwnerId == billingOwner.Id).ToList();
+        var billingHouseIds = houses.Select(h => h.Id).ToHashSet();
         var houseMap = houses.ToDictionary(h => h.Id, h => h.Name);
+
+        // Filter work entries to only billing owner's houses
+        workEntries = workEntries.Where(e => billingHouseIds.Contains(e.HouseId)).ToList();
+
+        // Filter misc entries to only billing owner's houses (include entries with null HouseId)
+        miscEntries = miscEntries.Where(e => !e.HouseId.HasValue || billingHouseIds.Contains(e.HouseId.Value)).ToList();
 
         var cleaningRates = await _rateService.GetByCategoryAsync("Cleaning");
         var laundryRates = await _rateService.GetByCategoryAsync("Laundry");
@@ -82,6 +99,7 @@ public class BillingReportService : IBillingReportService
             var rateCharged = workerRate?.RateCharged ?? defaultRate?.RateCharged ?? 0;
             var houseName = houseMap.GetValueOrDefault(group.Key.HouseId, "Unknown");
             var amount = totalHours * rateCharged;
+            if (amount == 0) continue;
 
             section.LineItems.Add(new BillingLineItem
             {
@@ -109,10 +127,11 @@ public class BillingReportService : IBillingReportService
             var rateCharged = workerRate?.RateCharged ?? defaultRate?.RateCharged ?? 0;
             var houseName = houseMap.GetValueOrDefault(entry.HouseId, "Unknown");
             var amount = loads * rateCharged;
+            if (amount == 0) continue;
 
             section.LineItems.Add(new BillingLineItem
             {
-                Description = $"{houseName} — {entry.EntryDate:MM/dd/yyyy} — {loads} loads @ ${rateCharged:F2}/load",
+                Description = $"{entry.EntryDate:MM/dd/yyyy} — {houseName} — {loads} loads",
                 Amount = amount
             });
         }
@@ -132,6 +151,7 @@ public class BillingReportService : IBillingReportService
             var workerLawnRate = lawnRates.FirstOrDefault(r => r.HouseId == entry.HouseId && r.WorkerId == entry.WorkerId);
             var defaultLawnRate = lawnRates.FirstOrDefault(r => r.HouseId == entry.HouseId && r.WorkerId == null);
             var rateCharged = workerLawnRate?.RateCharged ?? defaultLawnRate?.RateCharged ?? 0;
+            if (rateCharged == 0) continue;
             var houseName = houseMap.GetValueOrDefault(entry.HouseId, "Unknown");
 
             section.LineItems.Add(new BillingLineItem
