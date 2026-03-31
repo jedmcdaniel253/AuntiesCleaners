@@ -27,11 +27,9 @@
                 <MudTextField @bind-Value="_formName" Label="Name" Required="true"
                               RequiredError="Name is required."
                               Variant="Variant.Outlined" Class="mb-2" />
-                <MudTextField @bind-Value="_formEmail" Label="Email" Required="true"
-                              RequiredError="Email is required."
+                <MudTextField @bind-Value="_formEmail" Label="Email"
                               InputType="InputType.Email" Variant="Variant.Outlined" Class="mb-2" />
-                <MudTextField @bind-Value="_formPhone" Label="Phone" Required="true"
-                              RequiredError="Phone is required."
+                <MudTextField @bind-Value="_formPhone" Label="Phone"
                               InputType="InputType.Telephone" Variant="Variant.Outlined" Class="mb-2" />
                 <MudStack Row="true" Spacing="2">
                     <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveOwner">Save</MudButton>
@@ -119,8 +117,8 @@
     {
         _editingOwnerId = owner.Id;
         _formName = owner.Name;
-        _formEmail = owner.Email;
-        _formPhone = owner.Phone;
+        _formEmail = owner.Email ?? string.Empty;
+        _formPhone = owner.Phone ?? string.Empty;
         _showForm = true;
     }
 
@@ -138,32 +136,23 @@
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(_formEmail))
-        {
-            Snackbar.Add("Email is required.", Severity.Error);
-            return;
-        }
-
-        if (!new EmailAddressAttribute().IsValid(_formEmail))
+        if (!string.IsNullOrWhiteSpace(_formEmail) && !new EmailAddressAttribute().IsValid(_formEmail))
         {
             Snackbar.Add("Please enter a valid email address.", Severity.Error);
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(_formPhone))
-        {
-            Snackbar.Add("Phone is required.", Severity.Error);
-            return;
-        }
-
         try
         {
+            var emailValue = string.IsNullOrWhiteSpace(_formEmail) ? null : _formEmail.Trim();
+            var phoneValue = string.IsNullOrWhiteSpace(_formPhone) ? null : _formPhone.Trim();
+
             if (_editingOwnerId.HasValue)
             {
                 var owner = _owners.First(o => o.Id == _editingOwnerId.Value);
                 owner.Name = _formName.Trim();
-                owner.Email = _formEmail.Trim();
-                owner.Phone = _formPhone.Trim();
+                owner.Email = emailValue;
+                owner.Phone = phoneValue;
                 await OwnerService.UpdateAsync(owner);
                 Snackbar.Add("Owner updated.", Severity.Success);
             }
@@ -172,8 +161,8 @@
                 var owner = new Owner
                 {
                     Name = _formName.Trim(),
-                    Email = _formEmail.Trim(),
-                    Phone = _formPhone.Trim()
+                    Email = emailValue,
+                    Phone = phoneValue
                 };
                 await OwnerService.CreateAsync(owner);
                 Snackbar.Add("Owner created.", Severity.Success);

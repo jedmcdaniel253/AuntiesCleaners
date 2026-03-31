@@ -28,27 +28,25 @@ public class OwnerCrudTests
     /// <summary>
     /// Validates owner input fields. Returns true if all fields are valid.
     /// - Name must not be null, empty, or whitespace
-    /// - Email must not be null, empty, or whitespace, and must contain '@' followed by a '.' in the domain
-    /// - Phone must not be null, empty, or whitespace
+    /// - Email is optional, but if provided must contain '@' followed by a '.' in the domain
+    /// - Phone is optional
     /// </summary>
     private static bool IsValidOwner(string? name, string? email, string? phone)
     {
         if (string.IsNullOrWhiteSpace(name))
             return false;
 
-        if (string.IsNullOrWhiteSpace(email))
-            return false;
+        // Email is optional, but if provided must be valid format
+        if (!string.IsNullOrWhiteSpace(email))
+        {
+            var atIndex = email.IndexOf('@');
+            if (atIndex <= 0)
+                return false;
 
-        var atIndex = email.IndexOf('@');
-        if (atIndex <= 0)
-            return false;
-
-        var domain = email.Substring(atIndex + 1);
-        if (string.IsNullOrWhiteSpace(domain) || !domain.Contains('.'))
-            return false;
-
-        if (string.IsNullOrWhiteSpace(phone))
-            return false;
+            var domain = email.Substring(atIndex + 1);
+            if (string.IsNullOrWhiteSpace(domain) || !domain.Contains('.'))
+                return false;
+        }
 
         return true;
     }
@@ -159,47 +157,38 @@ public class OwnerCrudTests
 
     /// <summary>
     /// Property 3: Owner validation rejects invalid input
-    /// For any Owner input where the name is empty/whitespace, OR the email is empty/invalid,
-    /// OR the phone is empty/whitespace, the validation SHALL reject the input and the owner
-    /// list SHALL remain unchanged.
+    /// For any Owner input where the name is empty/whitespace, the validation SHALL reject the input.
+    /// Email and phone are optional. If email is provided, it must be valid format.
     /// **Validates: Requirements 2.3, 2.4, 2.5**
     /// </summary>
     [Property]
     public Property OwnerValidationRejectsInvalidInput()
     {
         var invalidNameGen = Gen.Elements<string?>("", " ", "  ", null);
-        var invalidEmailGen = Gen.Elements<string?>("", " ", "notanemail", "missing@", "@nodomain", null);
-        var invalidPhoneGen = Gen.Elements<string?>("", " ", "  ", null);
+        var invalidEmailGen = Gen.Elements<string?>("notanemail", "missing@", "@nodomain");
 
         var validNameGen = Generators.NonEmptyNameGen;
         var validEmailGen =
             from user in Generators.EmailWordGen
             from domain in Generators.EmailWordGen
             select $"{user}@{domain}.com";
-        var validPhoneGen = Gen.Elements("555-0100", "555-0200", "555-0300", "555-0400");
+        var validPhoneGen = Gen.Elements<string?>("555-0100", "555-0200", null, "");
 
-        // Case 1: invalid name with valid email and phone
+        // Case 1: invalid name (always rejected regardless of email/phone)
         var invalidNameCase =
             from name in invalidNameGen
-            from email in validEmailGen
+            from email in Gen.OneOf(validEmailGen.Select(e => (string?)e), Gen.Constant((string?)null))
             from phone in validPhoneGen
-            select (name, email: (string?)email, phone: (string?)phone);
+            select (name, email, phone);
 
-        // Case 2: valid name with invalid email and valid phone
+        // Case 2: valid name with invalid email format (rejected)
         var invalidEmailCase =
             from name in validNameGen
             from email in invalidEmailGen
             from phone in validPhoneGen
-            select (name: (string?)name, email, phone: (string?)phone);
-
-        // Case 3: valid name with valid email and invalid phone
-        var invalidPhoneCase =
-            from name in validNameGen
-            from email in validEmailGen
-            from phone in invalidPhoneGen
             select (name: (string?)name, email: (string?)email, phone);
 
-        var invalidInputGen = Gen.OneOf(invalidNameCase, invalidEmailCase, invalidPhoneCase);
+        var invalidInputGen = Gen.OneOf(invalidNameCase, invalidEmailCase);
 
         var invalidProp = Prop.ForAll(
             Arb.From(invalidInputGen),
@@ -209,12 +198,12 @@ public class OwnerCrudTests
                 return !IsValidOwner(name, email, phone);
             });
 
-        // Also verify that valid owners pass validation
+        // Valid owners: non-empty name, optional valid email, optional phone
         var validInputGen =
             from name in validNameGen
-            from email in validEmailGen
+            from email in Gen.OneOf(validEmailGen.Select(e => (string?)e), Gen.Constant((string?)null))
             from phone in validPhoneGen
-            select (name, email, phone);
+            select (name: (string?)name, email, phone);
 
         var validProp = Prop.ForAll(
             Arb.From(validInputGen),

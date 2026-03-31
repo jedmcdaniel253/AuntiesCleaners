@@ -328,8 +328,10 @@ public static class Generators
     public static Gen<Owner> OwnerGen =>
         from id in GuidGen
         from name in NonEmptyNameGen
+        from hasEmail in Gen.Elements(true, false)
         from emailUser in EmailWordGen
         from emailDomain in EmailWordGen
+        from hasPhone in Gen.Elements(true, false)
         from phone in Gen.Elements("555-0100", "555-0200", "555-0300", "555-0400")
         from isBilling in Gen.Elements(true, false)
         from updatedAt in ReasonableDateGen
@@ -337,8 +339,8 @@ public static class Generators
         {
             Id = id,
             Name = name,
-            Email = $"{emailUser}@{emailDomain}.com",
-            Phone = phone,
+            Email = hasEmail ? $"{emailUser}@{emailDomain}.com" : null,
+            Phone = hasPhone ? phone : null,
             IsBillingOwner = isBilling,
             UpdatedAt = updatedAt
         };
