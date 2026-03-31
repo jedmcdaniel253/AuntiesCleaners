@@ -68,13 +68,12 @@
                         <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
                                        Color="Color.Error"
                                        OnClick="@(() => ConfirmDelete(context))" aria-label="Delete owner" />
-                        @if (!context.IsBillingOwner)
-                        {
-                            <MudIconButton Icon="@Icons.Material.Filled.Star" Size="Size.Small"
-                                           Color="Color.Warning"
-                                           OnClick="@(() => SetBillingOwner(context))"
-                                           aria-label="Set as billing owner" />
-                        }
+                        <MudIconButton Icon="@(context.IsBillingOwner ? Icons.Material.Filled.Star : Icons.Material.Outlined.Star)"
+                                       Size="Size.Small"
+                                       Color="@(context.IsBillingOwner ? Color.Warning : Color.Default)"
+                                       OnClick="@(() => SetBillingOwner(context))"
+                                       Disabled="@context.IsBillingOwner"
+                                       aria-label="@(context.IsBillingOwner ? "Current billing owner" : "Set as billing owner")" />
                     </MudTd>
                 </RowTemplate>
             </MudTable>
