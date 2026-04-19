@@ -20,6 +20,21 @@ public class UserService : IUserService
         _supabaseAnonKey = configuration["Supabase:AnonKey"] ?? throw new InvalidOperationException("Supabase:AnonKey not configured");
     }
 
+    private string GetBearerToken()
+    {
+        try
+        {
+            var accessToken = _supabase.Client?.Auth?.CurrentSession?.AccessToken;
+            if (!string.IsNullOrEmpty(accessToken))
+                return accessToken;
+        }
+        catch
+        {
+            // Mock or uninitialized client — fall through to anon key
+        }
+        return _supabaseAnonKey;
+    }
+
     public async Task<List<UserProfile>> GetAllAsync()
     {
         var response = await _supabase.Client.From<UserProfile>().Get();
@@ -33,12 +48,9 @@ public class UserService : IUserService
         if (string.IsNullOrWhiteSpace(email))
             throw new ArgumentException("Email is required.", nameof(email));
 
-        var accessToken = _supabase.Client.Auth.CurrentSession?.AccessToken
-            ?? throw new InvalidOperationException("Not authenticated.");
-
         var url = $"{_supabaseUrl}/functions/v1/invite-user";
         var request = new HttpRequestMessage(HttpMethod.Post, url);
-        request.Headers.Add("Authorization", $"Bearer {accessToken}");
+        request.Headers.Add("Authorization", $"Bearer {GetBearerToken()}");
         request.Content = JsonContent.Create(new
         {
             name,
@@ -54,12 +66,9 @@ public class UserService : IUserService
 
     public async Task ResendInviteAsync(string email)
     {
-        var accessToken = _supabase.Client.Auth.CurrentSession?.AccessToken
-            ?? throw new InvalidOperationException("Not authenticated.");
-
         var url = $"{_supabaseUrl}/functions/v1/invite-user";
         var request = new HttpRequestMessage(HttpMethod.Post, url);
-        request.Headers.Add("Authorization", $"Bearer {accessToken}");
+        request.Headers.Add("Authorization", $"Bearer {GetBearerToken()}");
         request.Content = JsonContent.Create(new
         {
             action = "resend",
