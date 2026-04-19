@@ -20,7 +20,7 @@ serve(async (req: Request) => {
     });
   }
 
-  const resendApiKey = Deno.env.get("RESEND_API_KEY");
+  const resendApiKey = Deno.env.get("RESEND_API_KEY") || Deno.env.get("RESEND_EMAIL_API");
   if (!resendApiKey) {
     return new Response(
       JSON.stringify({ error: "RESEND_API_KEY not configured" }),
@@ -39,7 +39,7 @@ serve(async (req: Request) => {
     }
 
     const resendPayload: Record<string, unknown> = {
-      from: "Auntie's Cleaners <noreply@auntiecleaners.com>",
+      from: "Auntie's Cleaners <noreply@auntiescleaners.com>",
       to: [to],
       subject,
       html: body,

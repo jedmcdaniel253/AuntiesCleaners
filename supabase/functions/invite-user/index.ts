@@ -50,7 +50,7 @@ export async function sendInviteEmail(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: "Auntie's Cleaners <noreply@auntiecleaners.com>",
+        from: "Auntie's Cleaners <noreply@auntiescleaners.com>",
         to: [email],
         subject: "You're invited to Auntie's Cleaners",
         html,
@@ -119,6 +119,7 @@ export async function handleInvite(
   }
 
   // 1. Create auth user
+  console.log("[invite] Creating auth user:", email);
   const { data: authData, error: authError } =
     await supabaseAdmin.auth.admin.createUser({
       email,
@@ -144,6 +145,7 @@ export async function handleInvite(
   }
 
   const authUserId = authData.user.id;
+  console.log("[invite] Auth user created:", authUserId);
 
   // 2. Insert user_profiles row
   const profileRow: Record<string, unknown> = {
@@ -164,6 +166,7 @@ export async function handleInvite(
     .single();
 
   if (profileError) {
+    console.log("[invite] Profile creation failed:", profileError.message);
     // Rollback: delete the auth user we just created
     await supabaseAdmin.auth.admin.deleteUser(authUserId);
     return jsonResponse(
@@ -173,10 +176,12 @@ export async function handleInvite(
   }
 
   // 3. Generate recovery link
+  console.log("[invite] Profile created, generating recovery link");
   const { link: recoveryLink, error: linkError } =
     await generateRecoveryLink(supabaseAdmin, email!);
 
   if (!recoveryLink) {
+    console.log("[invite] Recovery link failed:", linkError);
     // Account and profile were created, but link generation failed
     return jsonResponse({
       success: true,
@@ -188,24 +193,27 @@ export async function handleInvite(
   }
 
   // 4. Send invite email
+  console.log("[invite] Sending invite email via Resend");
   const emailResult = await sendInviteEmail(
     resendApiKey,
     email!,
     name!,
     recoveryLink
   );
+  console.log("[invite] Email result:", JSON.stringify(emailResult));
 
-  const response: Record<string, unknown> = {
+  const inviteResponse: Record<string, unknown> = {
     success: true,
     userId: authUserId,
     profileId: profileData.id,
     emailSent: emailResult.emailSent,
   };
   if (emailResult.warning) {
-    response.warning = emailResult.warning;
+    inviteResponse.warning = emailResult.warning;
   }
 
-  return jsonResponse(response);
+  console.log("[invite] Done, returning response");
+  return jsonResponse(inviteResponse);
 }
 
 export async function handleResend(
@@ -279,7 +287,7 @@ serve(async (req: Request) => {
     );
   }
 
-  const resendApiKey = Deno.env.get("RESEND_API_KEY");
+  const resendApiKey = Deno.env.get("RESEND_API_KEY") || Deno.env.get("RESEND_EMAIL_API");
 
   // Validate authorization header
   const authHeader = req.headers.get("Authorization");
