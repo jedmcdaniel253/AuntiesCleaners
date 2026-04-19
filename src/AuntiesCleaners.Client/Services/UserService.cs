@@ -33,9 +33,12 @@ public class UserService : IUserService
         if (string.IsNullOrWhiteSpace(email))
             throw new ArgumentException("Email is required.", nameof(email));
 
+        var accessToken = _supabase.Client.Auth.CurrentSession?.AccessToken
+            ?? throw new InvalidOperationException("Not authenticated.");
+
         var url = $"{_supabaseUrl}/functions/v1/invite-user";
         var request = new HttpRequestMessage(HttpMethod.Post, url);
-        request.Headers.Add("Authorization", $"Bearer {_supabaseAnonKey}");
+        request.Headers.Add("Authorization", $"Bearer {accessToken}");
         request.Content = JsonContent.Create(new
         {
             name,
@@ -51,9 +54,12 @@ public class UserService : IUserService
 
     public async Task ResendInviteAsync(string email)
     {
+        var accessToken = _supabase.Client.Auth.CurrentSession?.AccessToken
+            ?? throw new InvalidOperationException("Not authenticated.");
+
         var url = $"{_supabaseUrl}/functions/v1/invite-user";
         var request = new HttpRequestMessage(HttpMethod.Post, url);
-        request.Headers.Add("Authorization", $"Bearer {_supabaseAnonKey}");
+        request.Headers.Add("Authorization", $"Bearer {accessToken}");
         request.Content = JsonContent.Create(new
         {
             action = "resend",
