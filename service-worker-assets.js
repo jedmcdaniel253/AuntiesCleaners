@@ -1,9 +1,13 @@
 self.assetsManifest = {
-  "version": "zMwI1RvU",
+  "version": "0oM9EaG1",
   "assets": [
     {
       "hash": "sha256-GOICr9yHA36MEPnZ8vharGMB011I3XMCR0K56HEw6WI=",
       "url": "AuntiesCleaners.Client.styles.css"
+    },
+    {
+      "hash": "sha256-LzrMAAw7qmuV5PTicqOHgDRg+ScerQJcsWHpIIYCCfQ=",
+      "url": "CNAME"
     },
     {
       "hash": "sha256-kBmVfU2BqUZUT8HPz7NUnkObDjxYKbSWXF5q33paHM0=",
@@ -18,8 +22,8 @@ self.assetsManifest = {
       "url": "_content/MudBlazor/MudBlazor.min.js.map"
     },
     {
-      "hash": "sha256-63foEEoahzOSG37tOp18Tasnc+HVEVCnDhL+mmiGzec=",
-      "url": "_framework/AuntiesCleaners.Client.5g567wovsb.wasm"
+      "hash": "sha256-BG5lev7rLjYOJkqYgR4QcjuzaYfAjpmblCExgHbjQpQ=",
+      "url": "_framework/AuntiesCleaners.Client.su7tx49fvb.wasm"
     },
     {
       "hash": "sha256-XePOw4Z+OeufSwFCiMWnMVrbvM9QiA5GcdKbUBOv8xk=",
@@ -394,7 +398,7 @@ self.assetsManifest = {
       "url": "_framework/Websocket.Client.sntjl98ana.wasm"
     },
     {
-      "hash": "sha256-ir1/a/YOvRLrq2jMfGXoxAlt4EzMSFgfm+QULQ2kdpU=",
+      "hash": "sha256-+reLSOwIgaFeyHWmqyLupx/yo5LADevlZmg8i9a2qao=",
       "url": "_framework/blazor.boot.json"
     },
     {
